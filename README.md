@@ -1,7 +1,9 @@
 # Premier League forward transfer-value model (2026-27)
 
 Predicts Transfermarkt market values for Premier League forwards and wingers from FBref stats,
-wages, contracts and Transfermarkt value history. Live site: https://claude.ai/artifact/7R5o7DMMQV4BqNVXFcrnog
+wages, contracts and Transfermarkt value history.
+
+**Live site: https://hughod.com/transfer-value-model/** (GitHub Pages, served from `docs/index.html`).
 
 ## Rebuild
 
@@ -11,6 +13,7 @@ python3 src/build_dataset.py        # data/raw/*.json -> data/interim/players_al
 python3 src/train.py > out/train_log.txt 2>&1   # nested-CV comparison (~6 min); don't pipe to head
 python3 src/export.py > out/export_log.txt 2>&1 # final models + out/site_data.json
 python3 -c "t=open('dashboard/template.html').read(); d=open('out/site_data.json').read(); open('dashboard/scouting_report.html','w').write(t.replace('__DATA__', d))"
+cp dashboard/scouting_report.html docs/index.html   # publishes to GitHub Pages on push
 ```
 
 ## Raw data (collected 2026-11-16 via the browser)
