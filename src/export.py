@@ -1,0 +1,133 @@
+"""Fit final models on all data and export everything the site needs.
+
+out/site_data.json : players (forwards) with OOF predictions, metrics, importances,
+                     model comparison, club context, calculator priors + both tree models.
+"""
+import json, sys
+from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+sys.path.insert(0, str(Path(__file__).parent))
+import train as T  # noqa: E402
+
+ROOT = Path(__file__).resolve().parents[1]
+INTERIM, OUT = ROOT / "data/interim", ROOT / "out"
+df = T.df
+store = pd.read_pickle(INTERIM / "oof_store.pkl")
+fwd, y, oof, params_used = store[("full", True)]
+_, _, oof_stats, _ = store[("stats_only", True)]
+CHOSEN = "blend"   # 50/50 LightGBM + ridge on log value
+
+POS3 = ["pos_DF", "pos_MF", "pos_GK"]
+models = {}
+for name, feats in [("full", T.FEATURE_SETS["full"] + POS3), ("stats_only", T.FEATURE_SETS["stats_only"] + POS3)]:
+    X, yy = df[feats], np.log(df.market_value_eur.to_numpy())
+    p = T.tune(X, yy, seed=7)
+    m = T.lgbm(p).fit(X, yy)
+    imp = pd.Series(m.booster_.feature_importance("gain"), index=feats)
+    imp = (imp / imp.sum()).sort_values(ascending=False)
+    dump = m.booster_.dump_model()
+
+    def slim(node):
+        if "leaf_value" in node:
+            return {"v": node["leaf_value"]}
+        return {"f": node["split_feature"], "t": node["threshold"], "dl": node["default_left"],
+                "mt": node["missing_type"], "l": slim(node["left_child"]), "r": slim(node["right_child"])}
+    rp = T.ridge().fit(X, yy)
+    imp_, sc_, rg_ = rp.steps[0][1], rp.steps[1][1], rp.steps[2][1]
+    ridge_exp = {"impute": [float(v) for v in imp_.statistics_], "ind": [int(i) for i in imp_.indicator_.features_],
+                 "mean": sc_.mean_.tolist(), "scale": sc_.scale_.tolist(), "coef": rg_.coef_.tolist(),
+                 "intercept": float(rg_.intercept_), "alpha": float(rg_.alpha_)}
+    models[name] = {"features": feats, "params": p, "trees": [slim(t["tree_structure"]) for t in dump["tree_info"]], "ridge": ridge_exp,
+                    "importance": [[k, round(float(v), 4)] for k, v in imp.items()],
+                    "check": {"x": X.iloc[fwd[:5]].to_numpy().tolist(), "pred": m.predict(X.iloc[fwd[:5]]).tolist(),
+                              "ridge": rp.predict(X.iloc[fwd[:5]]).tolist()}}
+    print(name, p, "top:", imp.head(8).round(3).to_dict())
+
+f = df.loc[fwd].copy()
+f["pred_full"] = np.exp(oof[CHOSEN])
+f["pred_stats"] = np.exp(oof_stats[CHOSEN])
+f["gap_pct"] = 100 * (f.pred_full - f.market_value_eur) / f.market_value_eur
+cols = ["name", "club", "position", "age", "market_value_eur", "pred_full", "pred_stats", "gap_pct",
+        "mv_1y_ago", "mv_peak_1y_ago", "annual_wage_eur", "contract_years_left", "international_caps",
+        "min_cur", "min_prev", "prev_season_league", "c_goals", "c_assists", "p_goals", "p_assists",
+        "ga_per90", "sh_per90", "height_cm", "foot", "id", "nat",
+        "starts_cur", "starts_prev", "c_shots", "p_shots", "c_shots_on_target", "p_shots_on_target",
+        "years_at_club", "years_since_extension", "senior_intl", "current_intl", "english", "intl_goals",
+        "mv_2y_ago", "is_winger", "actual_value_reported", "prev_val", "months_since_prev", "val_12m_before",
+        "peak_before", "mv_date"]
+players = f[cols].astype(object).where(f[cols].notna(), None)
+players["age"] = players["age"].map(lambda a: round(a, 1))
+full_feats = models["full"]["features"]
+# nominal (as-published) history for the calculator inputs
+from datetime import date as _date
+raw = {str(r["id"]): r["mvh"] for r in json.load(open(ROOT / "data/raw/transfermarkt_2026.json"))}
+def nominal(pid):
+    pts = sorted((datetime.strptime(d, "%d/%m/%Y").date(), v) for d, v, _ in raw.get(str(pid), []) if v)
+    if len(pts) < 2:
+        return None, None, None, None
+    cur_d = pts[-1][0]; before = [(d, v) for d, v in pts[:-1] if d < cur_d]
+    if not before:
+        return None, None, None, None
+    pd_, pv = before[-1]
+    months = round((_date(2026, 11, 16) - pd_).days / 30.44, 1)
+    anchor = _date(cur_d.year - 1, cur_d.month, min(cur_d.day, 28))
+    old = [v for d, v in before if d <= anchor]
+    return pv / 1e6, months, (old[-1] / 1e6 if old else None), max(v for _, v in before) / 1e6
+nom = [nominal(i) for i in f["id"]]
+players["prev_nom"], players["prev_months_ago"], players["v12_nom"], players["peak_nom"] = zip(*nom)
+players["fvec"] = [[None if pd.isna(v) else round(float(v), 5) for v in row] for row in f[full_feats].to_numpy()]
+
+# club context for the calculator (from every player at the club)
+club = df.groupby("club").agg(club_log_mv=("log_mv", "mean"), team_gd_per90=("team_gd_per90", "median"),
+                              ppg_cur=("ppg_cur", "median"), n=("name", "size")).reset_index()
+fw = df[df.is_forward == 1]
+nine = fw.c_minutes_90s.fillna(0) + T_W if (T_W := 0.75) else None
+priors = {}
+for feat, col in {"fouled_per90": "fouled", "crs_per90": "crosses", "int_per90": "interceptions",
+                  "tklw_per90": "tackles_won", "fls_per90": "fouls", "offsides_per90": "offsides",
+                  "penwon_per90": "pens_won", "gls_per90": "goals", "ast_per90": "assists",
+                  "npg_per90": "goals_pens", "sh_per90": "shots", "sot_per90": "shots_on_target"}.items():
+    tot = fw["c_" + col].fillna(0) + 0.75 * fw["p_" + col].fillna(0)
+    n90 = fw.c_minutes_90s.fillna(0) + 0.75 * fw.p_minutes_90s.fillna(0)
+    priors[col] = float(tot.sum() / n90.sum())
+med = {c: float(fw[c].median()) for c in ["years_since_extension", "height_cm", "ppg_cur", "team_gd_per90",
+                                          "minutes_share_cur", "intl_goals", "cards_per90"]}
+med_vec = [None if pd.isna(v) else float(v) for v in fw[models["full"]["features"]].median().to_numpy()]
+
+comp = pd.read_csv(INTERIM / "model_comparison.csv")
+y_eur = np.exp(y)
+ape_naive = ((f.prev_val - f.market_value_eur).abs() / f.market_value_eur).dropna()
+ape_naive1y = ((f.mv_1y_ago - f.market_value_eur).abs() / f.market_value_eur).dropna()
+site = {
+    "meta": {"snapshot": "2026-11-16", "n_forwards": int(len(f)), "n_training": int(len(df)),
+             "metrics": T.metrics(y, oof[CHOSEN]), "metrics_stats": T.metrics(y, oof_stats[CHOSEN]),
+             "inflation": 0.10, "naive1y_median_ape": round(100 * ape_naive1y.median(), 1), "naive1y_mean_ape": round(100 * ape_naive1y.mean(), 1),
+             "naive_within25": round(100 * (ape_naive <= 0.25).mean(), 1),
+             "naive_median_ape": round(100 * ape_naive.median(), 1), "naive_mean_ape": round(100 * ape_naive.mean(), 1),
+             "max_cur_minutes": float(df.c_minutes.max()), "priors": priors, "medians": med,
+             "max_minutes_cur": float(T.df.min_cur.max()), "median_fvec": med_vec},
+    "comparison": comp.to_dict("records"),
+    "players": players.to_dict("records"),
+    "clubs": club.round(4).to_dict("records"),
+    "models": models,
+}
+OUT.mkdir(exist_ok=True)
+def clean(o):
+    if isinstance(o, float):
+        return None if (o != o or o in (float("inf"), float("-inf"))) else o
+    if isinstance(o, dict):
+        return {k: clean(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [clean(v) for v in o]
+    if isinstance(o, (np.floating,)):
+        return clean(float(o))
+    if isinstance(o, (np.integer,)):
+        return int(o)
+    return o
+json.dump(clean(site), open(OUT / "site_data.json", "w"), separators=(",", ":"), allow_nan=False)
+print("players", len(players), "bytes", (OUT / "site_data.json").stat().st_size)
+print(f.sort_values("market_value_eur", ascending=False)[["name", "market_value_eur", "pred_full", "pred_stats", "gap_pct"]].head(25).round(0).to_string())

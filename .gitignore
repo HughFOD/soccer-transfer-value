@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+out/oof_store.pkl
+out/*.png
+data/interim/players_infl_*.csv
+# scraped data stays local (Transfermarkt / FBref content)
+data/raw/
+data/interim/
+out/site_data*.json
+out/*.txt
+dashboard/scouting_report.html
