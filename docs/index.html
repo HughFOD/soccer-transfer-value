@@ -5,123 +5,130 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Scouting Report</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
-/* Layout: one 1120px column. Summary tiles -> chart -> price table -> calculator -> how it works. */
+/* hughod.com house style: one blue world, cream type, lime for "worth more", orange for "worth less".
+   Single theme by design (same as the rest of hughod.com). Layout: 1120px column, mono labels, ruled rows. */
 :root{
-  color-scheme: light;
-  --page:#f6f6f2; --surface:#fdfdfb; --surface-2:#eeede6;
-  --ink:#111110; --ink-2:#4d4c48; --ink-muted:#85837c;
-  --grid:#e2e1d9; --border:rgba(17,17,16,.11); --border-strong:rgba(17,17,16,.2);
-  --pitch:#1f6f4a; --pitch-soft:#e3efe8;
-  --over:#d2453f; --under:#2a6fd0; --mid:#a3a19a;
-  --display:"Oswald","Arial Narrow",Arial,sans-serif;
-  --body:"Source Sans 3",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    color-scheme: dark;
-    --page:#0f100f; --surface:#191a18; --surface-2:#22231f;
-    --ink:#f4f4ef; --ink-2:#c4c3ba; --ink-muted:#8b8a83;
-    --grid:#2c2d29; --border:rgba(255,255,255,.1); --border-strong:rgba(255,255,255,.2);
-    --pitch:#4cb882; --pitch-soft:#1b2c22;
-    --over:#ec6a63; --under:#5592eb; --mid:#6f6e68;
-  }
-}
-:root[data-theme="dark"]{
   color-scheme: dark;
-  --page:#0f100f; --surface:#191a18; --surface-2:#22231f;
-  --ink:#f4f4ef; --ink-2:#c4c3ba; --ink-muted:#8b8a83;
-  --grid:#2c2d29; --border:rgba(255,255,255,.1); --border-strong:rgba(255,255,255,.2);
-  --pitch:#4cb882; --pitch-soft:#1b2c22;
-  --over:#ec6a63; --under:#5592eb; --mid:#6f6e68;
+  --bg:#1f3bff; --bg-deep:#1730d6; --ink:#fff6dc; --hot:#d9ff3c; --pop:#ff5a36;
+  --dim:rgba(255,246,220,.66); --line:rgba(255,246,220,.22); --wash:rgba(255,246,220,.07);
+  --display:"Space Grotesk",system-ui,sans-serif; --mono:"Space Mono",ui-monospace,monospace;
+  /* tokens the page script uses */
+  --page:var(--bg); --surface:var(--bg-deep); --surface-2:var(--wash);
+  --ink-2:rgba(255,246,220,.84); --ink-muted:var(--dim); --grid:rgba(255,246,220,.14);
+  --border:var(--line); --border-strong:rgba(255,246,220,.4);
+  --pitch:var(--hot); --under:var(--hot); --over:var(--pop); --mid:rgba(255,246,220,.42);
 }
 *{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--page);color:var(--ink);font:16px/1.5 var(--body)}
-.wrap{max-width:1120px;margin:0 auto;padding:28px 20px 64px;display:grid;gap:36px}
-h1,h2,h3{font-family:var(--display);font-weight:600;letter-spacing:.01em;text-wrap:balance;margin:0}
-h1{font-size:44px;line-height:1.05;text-transform:uppercase}
-h2{font-size:24px;text-transform:uppercase}
-h3{font-size:17px;text-transform:uppercase;color:var(--ink-2)}
-p{margin:0;max-width:68ch}
-.muted{color:var(--ink-muted)}
-.kicker{font-family:var(--display);font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--pitch);font-weight:600}
-header{display:grid;gap:10px;border-bottom:3px solid var(--ink);padding-bottom:18px}
-header .lede{color:var(--ink-2);font-size:18px}
-section{display:grid;gap:14px}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:18px}
-.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-.tile{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:14px 16px;display:grid;gap:2px}
-.tile .v{font-family:var(--display);font-size:34px;font-weight:600;font-variant-numeric:tabular-nums}
-.tile .l{font-size:14px;color:var(--ink-2)}
-.tile .s{font-size:13px;color:var(--ink-muted)}
-.tile.lead{border-left:4px solid var(--pitch)}
-@media (max-width:760px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))} h1{font-size:34px}}
+body{background:var(--bg);color:var(--ink);font:17px/1.6 var(--body,var(--display));-webkit-font-smoothing:antialiased}
+::selection{background:var(--hot);color:#111}
+a{color:inherit}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px 40px;display:grid;gap:56px}
+nav{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding:26px 0 0;font-family:var(--mono);font-size:13px}
+nav .mark{text-decoration:none;font-weight:700}
+nav .tabs{display:flex;gap:4px;flex-wrap:wrap}
+nav .tabs a{text-decoration:none;padding:6px 12px;border-radius:999px;opacity:.75}
+nav .tabs a:hover{opacity:1;background:rgba(255,246,220,.1)}
+nav .tabs a.on{background:var(--hot);color:#111;opacity:1}
+h1,h2,h3{font-family:var(--display);font-weight:700;letter-spacing:-.03em;text-wrap:balance;margin:0}
+h1{font-size:clamp(52px,9vw,104px);line-height:.92;letter-spacing:-.045em}
+h1 span{color:var(--hot)}
+h2{font-size:clamp(30px,4.5vw,44px);line-height:1}
+h3{font-size:14px;font-family:var(--mono);font-weight:400;letter-spacing:.12em;text-transform:uppercase;color:var(--hot)}
+p{margin:0;max-width:62ch}
+.muted{color:var(--dim)}
+.kicker,.label{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--hot);font-weight:400}
+header{display:grid;gap:22px;padding:40px 0 8px}
+header .lede{font-size:21px;line-height:1.5;max-width:36em;color:var(--ink)}
+header .lede em{font-style:normal;background:var(--hot);color:#111;padding:0 5px;border-radius:3px}
+section{display:grid;gap:18px}
+.card{border:1.5px solid var(--line);border-radius:14px;padding:22px;background:transparent}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.tile{padding:22px 18px 20px;display:grid;gap:4px;border-left:1px solid var(--line)}
+.tile:first-child{border-left:0;padding-left:0}
+.tile .v{font-family:var(--display);font-size:46px;font-weight:700;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums}
+.tile.lead .v{color:var(--hot)}
+.tile .l{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase}
+.tile .s{font-size:14px;color:var(--dim)}
+@media (max-width:760px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.tile:nth-child(3){border-left:0;padding-left:0}.tile:nth-child(n+3){border-top:1px solid var(--line)}}
 .chartbox{position:relative}
-svg text{fill:var(--ink-muted);font:12px var(--body)}
-.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--border-strong);border-radius:6px;padding:8px 10px;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.12);min-width:170px;display:none;z-index:5}
-.tip b{font-weight:700}
-.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--ink-2);align-items:center}
-.sw{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+svg text{fill:var(--dim);font:12px var(--mono)}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:#111;border-radius:10px;padding:10px 12px;font-size:14px;line-height:1.45;box-shadow:0 10px 30px rgba(0,0,30,.35);min-width:180px;display:none;z-index:5}
+.tip .muted{color:#555}
+.tip .pill.fair{color:#111;box-shadow:inset 0 0 0 1.5px rgba(17,17,17,.3)}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;color:var(--dim);align-items:center}
+.sw{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;vertical-align:middle}
 .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-input,select,button{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--border-strong);border-radius:5px;padding:6px 9px}
-input:focus-visible,select:focus-visible,button:focus-visible,th:focus-visible{outline:2px solid var(--pitch);outline-offset:1px}
-button{cursor:pointer}
-.seg{display:inline-flex;border:1px solid var(--border-strong);border-radius:5px;overflow:hidden}
-.seg button{border:0;border-radius:0;background:transparent;padding:6px 11px}
-.seg button[aria-pressed="true"]{background:var(--ink);color:var(--page)}
-.tablewrap{overflow-x:auto;max-height:620px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;background:var(--surface)}
-table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
-th,td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--grid);white-space:nowrap}
-th:first-child,td:first-child,th.l,td.l{text-align:left}
-thead th{position:sticky;top:0;background:var(--surface-2);font-weight:600;color:var(--ink-2);cursor:pointer;user-select:none;z-index:1}
-thead th[aria-sort="ascending"]::after{content:" ▲";font-size:10px}
-thead th[aria-sort="descending"]::after{content:" ▼";font-size:10px}
-tbody tr:hover{background:var(--surface-2)}
+input,select,button{font:15px var(--display);color:var(--ink);background:transparent;border:1.5px solid var(--line);border-radius:999px;padding:7px 14px}
+select option{color:#111;background:#fff}
+input[type=number]{border-radius:8px}
+input::placeholder{color:var(--dim)}
+input:focus-visible,select:focus-visible,button:focus-visible,th:focus-visible{outline:2px solid var(--hot);outline-offset:2px}
+button{cursor:pointer;font:700 13px var(--mono)}
+button:hover{background:var(--hot);border-color:var(--hot);color:#111}
+.seg{display:inline-flex;gap:4px}
+.seg button[aria-pressed="true"]{background:var(--hot);border-color:var(--hot);color:#111}
+.tablewrap{overflow-x:auto;max-height:640px;overflow-y:auto;border-top:1.5px solid var(--ink)}
+table{border-collapse:collapse;width:100%;font-size:15px;font-variant-numeric:tabular-nums}
+th,td{padding:10px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child,th.l,td.l{text-align:left;padding-left:0}
+thead th{position:sticky;top:0;background:var(--bg);font:400 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim);cursor:pointer;user-select:none;z-index:1}
+thead th[aria-sort]{color:var(--hot)}
+thead th[aria-sort="ascending"]::after{content:" ↑"}
+thead th[aria-sort="descending"]::after{content:" ↓"}
+td b{font-weight:500}
+tbody tr:hover td{background:var(--wash)}
 tbody tr{cursor:pointer}
-.pill{display:inline-block;min-width:62px;text-align:center;padding:1px 8px;border-radius:999px;font-weight:600;font-size:13px}
-.pill.under{background:color-mix(in srgb,var(--under) 16%,transparent);color:var(--under)}
-.pill.over{background:color-mix(in srgb,var(--over) 16%,transparent);color:var(--over)}
-.pill.fair{background:var(--surface-2);color:var(--ink-2)}
-.calc{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:18px;align-items:start}
+.pill{display:inline-block;min-width:60px;text-align:center;padding:2px 9px;border-radius:999px;font:700 12px var(--mono)}
+.pill.under{background:var(--hot);color:#111}
+.pill.over{background:var(--pop);color:#111}
+.pill.fair{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--line)}
+.calc{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:24px;align-items:start}
 @media (max-width:860px){.calc{grid-template-columns:1fr}}
-fieldset{border:1px solid var(--border);border-radius:6px;padding:12px 14px 14px;margin:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px 12px}
-legend{font-family:var(--display);text-transform:uppercase;font-size:14px;letter-spacing:.06em;color:var(--ink-2);padding:0 6px}
-.f{display:grid;gap:3px;font-size:13px;color:var(--ink-2)}
+fieldset{border:0;border-top:1px solid var(--line);padding:16px 0 4px;margin:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px 14px}
+legend{font:400 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--hot);padding:0 10px 0 0}
+.f{display:grid;gap:4px;font-size:13px;color:var(--dim)}
 .f input,.f select{width:100%}
-.f.check{grid-template-columns:auto 1fr;align-items:center;gap:7px}
-.f.check input{width:auto}
-.forms{display:grid;gap:12px}
-.result{position:sticky;top:12px;display:grid;gap:12px}
-.big{font-family:var(--display);font-size:52px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
-.band{height:10px;border-radius:5px;background:var(--surface-2);position:relative;margin-top:6px}
-.band i{position:absolute;top:0;bottom:0;background:color-mix(in srgb,var(--pitch) 35%,transparent);border-radius:5px}
-.band b{position:absolute;top:-3px;width:3px;height:16px;background:var(--pitch);border-radius:2px}
-.kv{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:14px;font-variant-numeric:tabular-nums}
-.kv span:nth-child(odd){color:var(--ink-2)}
-.bars{display:grid;gap:5px}
-.bar{display:grid;grid-template-columns:200px 1fr 46px;gap:10px;align-items:center;font-size:13px}
-.bar .t{height:12px;background:var(--surface-2);border-radius:3px;overflow:hidden}
-.bar .t i{display:block;height:100%;background:var(--pitch);border-radius:0 3px 3px 0}
-.bar .n{text-align:right;color:var(--ink-muted);font-variant-numeric:tabular-nums}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-@media (max-width:860px){.two{grid-template-columns:1fr}.bar{grid-template-columns:140px 1fr 40px}}
-.prose{display:grid;gap:10px;color:var(--ink-2)}
-.prose b{color:var(--ink)}
-ul{margin:0;padding-left:20px;display:grid;gap:6px;color:var(--ink-2);max-width:72ch}
-.note{font-size:13px;color:var(--ink-muted)}
-.hl td{background:color-mix(in srgb,var(--pitch) 10%,transparent)}
-@media (prefers-reduced-motion:no-preference){.band i,.band b{transition:left .25s,width .25s}}
+.f.check{grid-template-columns:auto 1fr;align-items:center;gap:8px}
+.f.check input{width:auto;accent-color:var(--hot)}
+.forms{display:grid;gap:18px}
+.result{position:sticky;top:16px;display:grid;gap:14px;background:var(--ink);color:#111;border-color:var(--ink)}
+.result .kicker{color:#1f3bff}
+.result .note{color:#555}
+.big{font-family:var(--display);font-size:64px;font-weight:700;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums}
+.band{height:10px;border-radius:5px;background:rgba(17,17,17,.1);position:relative;margin-top:6px}
+.band i{position:absolute;top:0;bottom:0;background:rgba(31,59,255,.3);border-radius:5px}
+.band b{position:absolute;top:-3px;width:3px;height:16px;background:#1f3bff;border-radius:2px}
+.kv{display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:14px;font-variant-numeric:tabular-nums;border-top:1px solid rgba(17,17,17,.15);padding-top:12px}
+.kv span:nth-child(odd){color:#555}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:200px 1fr 50px;gap:12px;align-items:center;font-size:14px}
+.bar .t{height:10px;background:var(--wash);border-radius:999px;overflow:hidden}
+.bar .t i{display:block;height:100%;background:var(--hot);border-radius:999px}
+.bar .n{text-align:right;color:var(--dim);font:12px var(--mono)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+@media (max-width:860px){.two{grid-template-columns:1fr}.bar{grid-template-columns:140px 1fr 44px}}
+.prose{display:grid;gap:12px;align-content:start;color:var(--dim);font-size:16px}
+.prose b{color:var(--ink);font-weight:500}
+ul{margin:0;padding-left:20px;display:grid;gap:8px;color:var(--dim);max-width:72ch}
+ul b{color:var(--ink);font-weight:500}
+.note{font-size:13px;color:var(--dim);font-family:var(--mono);line-height:1.6}
+.hl td{background:rgba(217,255,60,.12)}
+#cmp tbody tr{cursor:default}
+footer{padding:28px 0 50px;font-family:var(--mono);font-size:12px;color:var(--dim);border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+@media (prefers-reduced-motion:no-preference){.band i,.band b{transition:left .25s,width .25s}button,nav .tabs a{transition:background .15s,color .15s}}
 </style>
 </head>
 <body>
 <div class="wrap">
 
+<nav><a class="mark" href="https://hughod.com/">hughod.com</a><span class="tabs"><a href="https://hughod.com/">home</a><a href="https://hughod.com/projects.html" class="on">projects</a><a href="https://hughod.com/about.html">about</a><a href="https://hughod.com/contact.html">contact</a></span></nav>
 <header>
-  <div class="kicker">Premier League · Forwards & wingers · Snapshot <span id="snap"></span></div>
-  <h1>Scouting Report</h1>
-  <p class="lede">What is a Premier League forward worth right now? A model trained on this season's stats, last season's Big-5 output, wages, contracts and each player's Transfermarkt value trajectory estimates it. All values are in today's money: past valuations are inflated at 10% a year, in line with Premier League price growth. Every estimate below is out-of-sample: no player's own current value was used to price him.</p>
+  <div class="label">Premier League forwards &amp; wingers · snapshot <span id="snap"></span></div>
+  <h1>Scouting<br><span>Report.</span></h1>
+  <p class="lede">What is a Premier League forward worth <em>right now</em>? A model trained on this season's stats, last season's output across 16 leagues, wages, contracts and each player's Transfermarkt value trajectory prices all 153 of them. Every estimate below is out-of-sample, in today's money.</p>
 </header>
 
 <section aria-label="Model accuracy">
@@ -152,7 +159,7 @@ ul{margin:0;padding-left:20px;display:grid;gap:6px;color:var(--ink-2);max-width:
     <span class="note" id="count"></span>
   </div>
   <div class="tablewrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
-  <p class="note">Transfermarkt values are restated to 16 Nov 2026 money (most were set between June and October). Prev. value is his previous Transfermarkt valuation, also restated. Gap = (model estimate − Transfermarkt value) ÷ Transfermarkt value. Blue: model thinks he's worth more. Red: model thinks he's worth less. "Stats-only" is the same model without any value history, which shows what the on-pitch numbers alone say.</p>
+  <p class="note">Transfermarkt values are restated to 16 Nov 2026 money (most were set between June and October). Prev. value is his previous Transfermarkt valuation, also restated. Gap = (model estimate − Transfermarkt value) ÷ Transfermarkt value. Lime: model thinks he's worth more. Orange: model thinks he's worth less. "Stats-only" is the same model without any value history, which shows what the on-pitch numbers alone say.</p>
 </section>
 
 <section id="calculator">
@@ -222,8 +229,8 @@ ul{margin:0;padding-left:20px;display:grid;gap:6px;color:var(--ink-2);max-width:
 <section>
   <h2>What drives the estimate</h2>
   <div class="two">
-    <div class="card"><h3 style="margin-bottom:10px">Full model (LightGBM half): share of split gain</h3><div class="bars" id="imp_full"></div></div>
-    <div class="card"><h3 style="margin-bottom:10px">Stats-only model (LightGBM half)</h3><div class="bars" id="imp_stats"></div></div>
+    <div class="card"><h3 style="margin-bottom:14px">Full model (LightGBM half): share of split gain</h3><div class="bars" id="imp_full"></div></div>
+    <div class="card"><h3 style="margin-bottom:14px">Stats-only model (LightGBM half)</h3><div class="bars" id="imp_stats"></div></div>
   </div>
 </section>
 
@@ -259,7 +266,7 @@ ul{margin:0;padding-left:20px;display:grid;gap:6px;color:var(--ink-2);max-width:
     </div>
   </div>
 </section>
-<p class="note">Built from Transfermarkt and FBref (Sports Reference) data collected 16 November 2026. Market values are Transfermarkt's estimates.</p>
+<footer><span>© 2026 Hugh O'Donnell</span><span>Data: Transfermarkt &amp; FBref, collected 16 Nov 2026 · <a href="https://github.com/HughFOD/transfer-value-model">code on GitHub ↗</a></span></footer>
 </div>
 
 <script>
@@ -463,7 +470,7 @@ document.querySelector(".forms").addEventListener("input", e => { if (e.target.i
 loadPlayer(P.findIndex(p => p.name === "Bukayo Saka"));
 
 // ---------- importance + comparison
-const NICE = {log_prev_val:"Previous valuation", months_since_prev:"Months since prev. valuation", log_val_12m_before:"Value 12 months earlier", momentum_12m:"Value momentum (12 mo)", log_peak_before:"Peak value before", log_mv_1y_ago:"Value 1 year ago", age:"Age", pooled_90s:"Minutes (pooled 90s)", contract_years_left:"Contract years left", experience_score:"Experience (mins × caps)", min_cur:"Minutes this season", log_mv_peak_1y_ago:"Peak value", age_sq:"Age²", club_loo_log_mv:"Club squad value", years_since_extension:"Years since extension", log_wage:"Wage", mv_trend_prev_year:"Value trend (prior yr)", min_prev:"Minutes last season", ga_per90:"G+A per 90", npga_per90:"Non-pen G+A per 90", years_at_club:"Years at club", team_gd_per90:"Team goal diff. on pitch", international_caps:"Caps", caps_per_age:"Caps per year", sh_per90:"Shots per 90", gls_per90:"Goals per 90", ast_per90:"Assists per 90", age_from_peak:"Distance from age 26", ga_prev:"G+A last season", ga_cur:"G+A this season", height_cm:"Height", ppg_cur:"Team points per game", fouled_per90:"Fouled per 90", starts_prev:"Starts last season", starts_cur:"Starts this season", minutes_share_cur:"Share of minutes", sot_per90:"Shots on target per 90", g_per_sh:"Goals per shot", pos_MF:"Is midfielder", pos_DF:"Is defender", pos_GK:"Is goalkeeper", n_valuations:"No. of valuations", intl_goals:"International goals"};
+const NICE = {months_since_valuation:"Age of TM valuation", prev_big5:"Played Big-5 last season", prev_pl:"Played PL last season", prev_champ:"Played Championship last season", prev_other:"Played other league last season", former_intl:"Former international", current_intl:"Current international", youth_intl:"Youth international", has_wage:"Has wage data", log_prev_val:"Previous valuation", months_since_prev:"Months since prev. valuation", log_val_12m_before:"Value 12 months earlier", momentum_12m:"Value momentum (12 mo)", log_peak_before:"Peak value before", log_mv_1y_ago:"Value 1 year ago", age:"Age", pooled_90s:"Minutes (pooled 90s)", contract_years_left:"Contract years left", experience_score:"Experience (mins × caps)", min_cur:"Minutes this season", log_mv_peak_1y_ago:"Peak value", age_sq:"Age²", club_loo_log_mv:"Club squad value", years_since_extension:"Years since extension", log_wage:"Wage", mv_trend_prev_year:"Value trend (prior yr)", min_prev:"Minutes last season", ga_per90:"G+A per 90", npga_per90:"Non-pen G+A per 90", years_at_club:"Years at club", team_gd_per90:"Team goal diff. on pitch", international_caps:"Caps", caps_per_age:"Caps per year", sh_per90:"Shots per 90", gls_per90:"Goals per 90", ast_per90:"Assists per 90", age_from_peak:"Distance from age 26", ga_prev:"G+A last season", ga_cur:"G+A this season", height_cm:"Height", ppg_cur:"Team points per game", fouled_per90:"Fouled per 90", starts_prev:"Starts last season", starts_cur:"Starts this season", minutes_share_cur:"Share of minutes", sot_per90:"Shots on target per 90", g_per_sh:"Goals per shot", pos_MF:"Is midfielder", pos_DF:"Is defender", pos_GK:"Is goalkeeper", n_valuations:"No. of valuations", intl_goals:"International goals"};
 function bars(sel, imp){ const top = imp.slice(0, 12), mx = top[0][1];
   $(sel).innerHTML = top.map(([k, v]) => `<div class="bar"><span>${NICE[k] || k}</span><span class="t"><i style="width:${v / mx * 100}%"></i></span><span class="n">${(v * 100).toFixed(1)}%</span></div>`).join(""); }
 bars("#imp_full", FULL.importance); bars("#imp_stats", STATS.importance);
