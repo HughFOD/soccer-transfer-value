@@ -310,6 +310,33 @@ for col in count_cols:
     for pre in ("c_", "p_"):
         if pre + col not in df:
             df[pre + col] = np.nan
+# ---- League strength (Opta Power Rankings, average club rating; gap to the Premier League of the same release)
+# Big-5 from the June 2025 release (PL 92.6); the rest from the Oct 2023 release (PL 87.3), which is the
+# latest with their numbers; Scottish from a 2023 table (PL 87.6). League One isn't published: assumed -20.
+LEAGUE_GAP = {
+    "Premier League": 0.0, "La Liga": 92.6 - 87.0, "Serie A": 92.6 - 87.0, "Bundesliga": 92.6 - 86.3,
+    "Ligue 1": 92.6 - 85.5, "championship": 87.3 - 78.58, "eredivisie": 87.3 - 77.24, "primeira": 87.3 - 77.20,
+    "belgian": 87.3 - 77.19, "brazil": 87.3 - 76.43, "super_lig": 87.3 - 75.65, "danish": 87.3 - 75.00,
+    "mls": 87.3 - 74.77, "allsvenskan": 87.3 - 72.30, "scottish": 87.59 - 70.25, "league_one": 20.0,
+}
+# Tested 2026-11-19 (nested CV, b = 0, .02, .03, .05, .08): no gain for the full model (12.4-12.8% median APE
+# vs 12.3%) and the stats-only model got slightly worse as b rose (25.5% -> 26.7%). Off by default.
+LEAGUE_B = float(os.environ.get("LEAGUE_B", "0.0"))   # output discount per rating point: factor = exp(-b * gap)
+
+
+def league_gap(cl):
+    if not isinstance(cl, str) or not cl:
+        return np.nan
+    gaps = [g for name, g in LEAGUE_GAP.items() for part in cl.split(" / ") if name.lower() in part.lower()]
+    return float(np.mean(gaps)) if gaps else np.nan
+
+
+df["prev_league_gap"] = df["p_comp_level"].map(league_gap)
+_factor = np.exp(-LEAGUE_B * df["prev_league_gap"].fillna(0))
+df["prev_league_factor"] = _factor
+for col in ["goals", "assists", "goals_pens", "shots", "shots_on_target", "fouled", "crosses", "offsides", "pens_won"]:
+    if "p_" + col in df:
+        df["p_" + col] = df["p_" + col] * _factor   # last season's attacking output in Premier League terms
 _cl = df["p_comp_level"].fillna("")
 df["prev_season_league"] = np.select(
     [_cl.str.contains("Premier League"), _cl.str.contains("La Liga|Serie A|Bundesliga|Ligue 1"),
