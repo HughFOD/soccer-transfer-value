@@ -1,7 +1,8 @@
 """Fit final models on all data and export everything the site needs.
 
-out/site_data.json : players (forwards) with OOF predictions, metrics, importances,
-                     model comparison, club context, calculator priors + both tree models.
+out/site_data.json : every player (all positions) with OOF predictions, per-position metrics, importances,
+                     model comparison, club context, calculator priors + both models (trees + ridge).
+v14 (2026-11-20): all positions; OOF from src/allpos.py (folds over all players); stats-only model = stats_xg.
 """
 import json, sys
 from datetime import datetime
@@ -16,14 +17,16 @@ import train as T  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 INTERIM, OUT = ROOT / "data/interim", ROOT / "out"
 df = T.df
-store = pd.read_pickle(INTERIM / "oof_store.pkl")
-fwd, y, oof, params_used = store[("full", True)]
-_, _, oof_stats, _ = store[("stats_only", True)]
+FULL_FS, STATS_FS = "full", "stats_xg"
+oof = pd.read_pickle(INTERIM / f"oof_allpos_{FULL_FS}.pkl")
+oof_stats = pd.read_pickle(INTERIM / f"oof_allpos_{STATS_FS}.pkl")
+fwd = np.arange(len(df))                      # every player is scored now
+y = np.log(df.market_value_eur.to_numpy())
 CHOSEN = "blend"   # 50/50 LightGBM + ridge on log value
 
 POS3 = ["pos_DF", "pos_MF", "pos_GK"]
 models = {}
-for name, feats in [("full", T.FEATURE_SETS["full"] + POS3), ("stats_only", T.FEATURE_SETS["stats_only"] + POS3)]:
+for name, feats in [("full", T.FEATURE_SETS[FULL_FS] + POS3), ("stats_only", T.FEATURE_SETS[STATS_FS] + POS3)]:
     X, yy = df[feats], np.log(df.market_value_eur.to_numpy())
     p = T.tune(X, yy, seed=7)
     m = T.lgbm(p).fit(X, yy)
@@ -58,10 +61,10 @@ cols = ["name", "club", "position", "age", "market_value_eur", "pred_full", "pre
         "starts_cur", "starts_prev", "c_shots", "p_shots", "c_shots_on_target", "p_shots_on_target",
         "years_at_club", "years_since_extension", "senior_intl", "current_intl", "english", "intl_goals",
         "mv_2y_ago", "is_winger", "actual_value_reported", "prev_val", "months_since_prev", "val_12m_before",
-        "peak_before", "mv_date"]
+        "peak_before", "mv_date", "pos_group", "xg_p90", "xa_p90", "def_contrib_p90", "fm_rating"]
 players = f[cols].astype(object).where(f[cols].notna(), None)
 players["age"] = players["age"].map(lambda a: round(a, 1))
-full_feats = models["full"]["features"]
+full_feats = list(dict.fromkeys(models["full"]["features"] + models["stats_only"]["features"]))   # union for the calculator
 # nominal (as-published) history for the calculator inputs
 from datetime import date as _date
 raw = {str(r["id"]): r["mvh"] for r in json.load(open(ROOT / "data/raw/transfermarkt_2026.json"))}
@@ -96,14 +99,22 @@ for feat, col in {"fouled_per90": "fouled", "crs_per90": "crosses", "int_per90":
     priors[col] = float(tot.sum() / n90.sum())
 med = {c: float(fw[c].median()) for c in ["years_since_extension", "height_cm", "ppg_cur", "team_gd_per90",
                                           "minutes_share_cur", "intl_goals", "cards_per90"]}
-med_vec = [None if pd.isna(v) else float(v) for v in fw[models["full"]["features"]].median().to_numpy()]
+med_vec = {g: [None if pd.isna(v) else float(v) for v in df[df.pos_group == g][full_feats].median().to_numpy()]
+           for g in ["FW", "MF", "DF", "GK"]}
 
-comp = pd.read_csv(INTERIM / "model_comparison.csv")
+comp = pd.read_csv(ROOT / "out/cmp_r11.csv")
 y_eur = np.exp(y)
 ape_naive = ((f.prev_val - f.market_value_eur).abs() / f.market_value_eur).dropna()
 ape_naive1y = ((f.mv_1y_ago - f.market_value_eur).abs() / f.market_value_eur).dropna()
+by_pos = []
+for g, label in [("FW", "Forwards"), ("MF", "Midfielders"), ("DF", "Defenders"), ("GK", "Goalkeepers")]:
+    m = (df.pos_group == g).to_numpy()
+    nv = ((df.prev_val - df.market_value_eur).abs() / df.market_value_eur)[m].dropna()
+    by_pos.append(dict(group=g, label=label, n=int(m.sum()), **T.metrics(y[m], oof[CHOSEN][m]),
+                       stats=T.metrics(y[m], oof_stats[CHOSEN][m]), naive_median_ape=round(100 * nv.median(), 1)))
 site = {
-    "meta": {"snapshot": "2026-11-16", "n_forwards": int(len(f)), "n_training": int(len(df)),
+    "meta": {"snapshot": "2026-11-16", "n_players": int(len(f)), "n_training": int(len(df)), "by_pos": by_pos,
+             "features_union": full_feats, "logged": "2026-11-20",
              "metrics": T.metrics(y, oof[CHOSEN]), "metrics_stats": T.metrics(y, oof_stats[CHOSEN]),
              "inflation": 0.10, "naive1y_median_ape": round(100 * ape_naive1y.median(), 1), "naive1y_mean_ape": round(100 * ape_naive1y.mean(), 1),
              "naive_within25": round(100 * (ape_naive <= 0.25).mean(), 1),

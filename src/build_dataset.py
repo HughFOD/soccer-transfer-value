@@ -285,6 +285,46 @@ df["club_loo_log_mv"] = (g.transform("sum") - df["log_mv"]) / (g.transform("coun
 # How stale TM's current value is: a value set in June predates every 2026-27 minute (the Kroupi case).
 # Known for training rows; the calculator sets it to 0 ("valued today").
 df["months_since_valuation"] = [((TODAY - d).days / 30.44) if d else np.nan for d in df["mv_date"]]
+# ---- Transfer history (Transfermarkt): signals that tend to precede big re-ratings
+TRF = RAW / "transfermarkt_transfers_2026.json"
+if TRF.exists():
+    trf = json.load(open(TRF))
+
+    def transfer_features(pid):
+        rows = []
+        for d, frm, to, fee, mv, upcoming in trf.get(str(pid), []):
+            try:
+                dd = datetime.strptime(d, "%Y-%m-%d").date()
+            except Exception:
+                continue
+            if upcoming or dd > TODAY:
+                continue
+            f = str(fee or "")
+            loan = "loan" in f.lower()
+            end_loan = f.lower().startswith("end of loan")
+            eur = money(f) if "€" in f else (0.0 if "free" in f.lower() else np.nan)
+            rows.append((dd, eur, loan, end_loan, frm))
+        rows.sort(reverse=True)
+        out = dict(last_fee=np.nan, months_since_move=np.nan, last_move_loan=0, n_moves_3y=0,
+                   max_fee=np.nan, youth_promotion=0)
+        perm = [r for r in rows if not r[3]]                      # ignore "end of loan" returns
+        if perm:
+            d0, e0, l0, _, frm0 = perm[0]
+            out["months_since_move"] = (TODAY - d0).days / 30.44
+            out["last_move_loan"] = int(l0)
+            out["last_fee"] = infl(e0, d0) if e0 == e0 else np.nan
+            out["youth_promotion"] = int(bool(re.search(r"U1\d|U2\d|Youth|Academy|II$| B$", str(frm0))))
+        fees = [infl(e, d) for d, e, l, el, _ in perm if e == e and e > 0 and not l]
+        out["max_fee"] = max(fees) if fees else np.nan
+        out["n_moves_3y"] = sum(1 for r in perm if (TODAY - r[0]).days < 3 * 365)
+        return out
+
+    TF = pd.DataFrame([transfer_features(i) for i in df["id"]], index=df.index)
+    df = pd.concat([df, TF], axis=1)
+    df["log_last_fee"] = np.log1p(df["last_fee"])
+    df["log_max_fee"] = np.log1p(df["max_fee"])
+    df["fee_vs_prev_val"] = np.log((df["last_fee"] + 1e5) / (df["prev_val"] + 1e5))
+    df["recent_big_move"] = ((df["months_since_move"] < 18) & (df["last_fee"] > 0)).astype(int)
 df["log_prev_val"] = np.log(df["prev_val"])
 df["log_val_12m_before"] = np.log(df["val_12m_before"])
 df["log_peak_before"] = np.log(df["peak_before"])
@@ -378,8 +418,22 @@ df["ga_prev"] = df["p_goals"].fillna(0) + df["p_assists"].fillna(0)
 df["team_gd_per90"] = ((df["c_on_goals_for"].fillna(0) - df["c_on_goals_against"].fillna(0)
                         + W_PREV * (df["pl26_on_gf"].fillna(0) - df["pl26_on_ga"].fillna(0)))
                        / (df["c_minutes"].fillna(0) / 90 + W_PREV * df["pl26_pt_min"].fillna(0) / 90 + K))
+# breakout form: this season's G+A per 90 vs last season's (both shrunk), and fresh extensions
+_n_c = df["c_minutes_90s"].fillna(0); _n_p = df["p_minutes_90s"].fillna(0)
+_pr = df.loc[fwd_mask, "ga_per90"].median()
+df["ga90_cur_shrunk"] = (df["c_goals"].fillna(0) + df["c_assists"].fillna(0) + K * _pr) / (_n_c + K)
+df["ga90_prev_shrunk"] = (df["p_goals"].fillna(0) + df["p_assists"].fillna(0) + K * _pr) / (_n_p + K)
+df["form_jump"] = df["ga90_cur_shrunk"] - df["ga90_prev_shrunk"]
+df["recent_extension"] = (df["years_since_extension"] < 0.75).astype(int)
 df["experience_score"] = np.log1p(df["min_cur"] + df["min_prev"]) * (1 + df["international_caps"] / 50)
 
+# FotMob: xG/xA, chance creation, defensive actions, match rating (see src/fotmob.py)
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).parent))
+from fotmob import fotmob_features  # noqa: E402
+_fm = fotmob_features(df)
+if _fm is not None:
+    df = pd.concat([df, _fm], axis=1)
 df["is_forward"] = fwd_mask.astype(int)
 drop = ["mvh", "href", "dob_age", "info"]
 df.drop(columns=[c for c in drop if c in df], inplace=True)

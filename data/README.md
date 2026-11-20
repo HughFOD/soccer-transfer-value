@@ -9,4 +9,8 @@ The scraped inputs live outside the repo. To rebuild, place these in `data/raw/`
 - `fbref_other_2026.json` - FBref 2025-26 stats for 11 more leagues (Championship, League One,
   Portugal, Netherlands, Belgium, Scotland, Denmark, Sweden, Turkey, Brazil, MLS).
 
+- `fotmob_2026.json` - FotMob player stats (xG, xA, chance creation, defensive actions, match rating),
+  2026-27 PL and 2025-26 for 16 leagues, from data.fotmob.com stat lists.
+- `transfermarkt_transfers_2026.json` - every transfer and fee for the 547 players (`/ceapi/transferHistory/list/<id>`).
+
 Then run the pipeline in the top-level README. `data/interim/` and `out/` are generated.

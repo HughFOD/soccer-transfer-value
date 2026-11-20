@@ -47,6 +47,11 @@ STATS = ["min_cur", "min_prev", "starts_cur", "starts_prev", "minutes_share_cur"
          "sot_per90", "g_per_sh", "fouled_per90", "crs_per90", "int_per90", "tklw_per90",
          "fls_per90", "offsides_per90", "cards_per90", "ga_cur", "ga_prev", "experience_score"]
 WAGE = ["log_wage", "has_wage"]
+JUMP = ["log_last_fee", "log_max_fee", "fee_vs_prev_val", "months_since_move", "recent_big_move", "last_move_loan",
+        "n_moves_3y", "youth_promotion", "form_jump", "recent_extension"]
+XG = ["xg_p90", "xa_p90", "xgxa_p90", "bcc_p90", "chances_p90", "dribbles_p90", "finishing", "fm_rating", "fm_matched"]
+DEF = ["tackles_p90", "fm_int_p90", "clearances_p90", "blocks_p90", "recoveries_p90", "press_wins_p90",
+       "def_contrib_p90", "passes_p90", "long_balls_p90"]
 HISTORY_CAL = ["log_mv_1y_ago", "log_mv_peak_1y_ago", "mv_trend_prev_year", "n_valuations"]   # Round 7 v11: anchored to today
 HISTORY = ["months_since_valuation", "log_prev_val", "months_since_prev", "log_val_12m_before", "momentum_12m", "log_peak_before", "n_valuations"]
 
@@ -55,6 +60,10 @@ FEATURE_SETS = {
     "stats_wage": PROFILE + CLUB + STATS + WAGE,
     "full": PROFILE + CLUB + STATS + WAGE + HISTORY,
     "full_calendar": PROFILE + CLUB + STATS + WAGE + HISTORY_CAL,
+    "full_jump": PROFILE + CLUB + STATS + WAGE + HISTORY + JUMP,
+    "full_xg": PROFILE + CLUB + STATS + WAGE + HISTORY + XG + DEF,
+    "full_all": PROFILE + CLUB + STATS + WAGE + HISTORY + JUMP + XG + DEF,
+    "stats_xg": PROFILE + CLUB + STATS + XG + DEF,
     "full_no_staleness": PROFILE + CLUB + STATS + WAGE + [h for h in HISTORY if h != "months_since_valuation"],
 }
 GRID = {"n_estimators": [300, 600], "learning_rate": [0.03, 0.06],
