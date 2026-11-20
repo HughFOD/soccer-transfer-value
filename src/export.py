@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 INTERIM, OUT = ROOT / "data/interim", ROOT / "out"
 df = T.df
 FULL_FS, STATS_FS = "full", "stats_xg"
-oof = pd.read_pickle(INTERIM / f"oof_allpos_{FULL_FS}.pkl")
+oof = pd.read_pickle(INTERIM / f"oof_allpos_{FULL_FS}_change.pkl")   # v15: full model predicts the change from the previous valuation
 oof_stats = pd.read_pickle(INTERIM / f"oof_allpos_{STATS_FS}.pkl")
 fwd = np.arange(len(df))                      # every player is scored now
 y = np.log(df.market_value_eur.to_numpy())
@@ -28,6 +28,9 @@ POS3 = ["pos_DF", "pos_MF", "pos_GK"]
 models = {}
 for name, feats in [("full", T.FEATURE_SETS[FULL_FS] + POS3), ("stats_only", T.FEATURE_SETS[STATS_FS] + POS3)]:
     X, yy = df[feats], np.log(df.market_value_eur.to_numpy())
+    if name == "full":   # learn log(value / previous valuation) on players that have one
+        has = df.prev_val.notna().to_numpy()
+        X, yy = X[has], yy[has] - np.log(df.prev_val.to_numpy()[has])
     p = T.tune(X, yy, seed=7)
     m = T.lgbm(p).fit(X, yy)
     imp = pd.Series(m.booster_.feature_importance("gain"), index=feats)
@@ -44,10 +47,10 @@ for name, feats in [("full", T.FEATURE_SETS[FULL_FS] + POS3), ("stats_only", T.F
     ridge_exp = {"impute": [float(v) for v in imp_.statistics_], "ind": [int(i) for i in imp_.indicator_.features_],
                  "mean": sc_.mean_.tolist(), "scale": sc_.scale_.tolist(), "coef": rg_.coef_.tolist(),
                  "intercept": float(rg_.intercept_), "alpha": float(rg_.alpha_)}
-    models[name] = {"features": feats, "params": p, "trees": [slim(t["tree_structure"]) for t in dump["tree_info"]], "ridge": ridge_exp,
+    models[name] = {"target": "change" if name == "full" else "level", "features": feats, "params": p, "trees": [slim(t["tree_structure"]) for t in dump["tree_info"]], "ridge": ridge_exp,
                     "importance": [[k, round(float(v), 4)] for k, v in imp.items()],
-                    "check": {"x": X.iloc[fwd[:5]].to_numpy().tolist(), "pred": m.predict(X.iloc[fwd[:5]]).tolist(),
-                              "ridge": rp.predict(X.iloc[fwd[:5]]).tolist()}}
+                    "check": {"x": X.iloc[:5].to_numpy().tolist(), "pred": m.predict(X.iloc[:5]).tolist(),
+                              "ridge": rp.predict(X.iloc[:5]).tolist()}}
     print(name, p, "top:", imp.head(8).round(3).to_dict())
 
 f = df.loc[fwd].copy()

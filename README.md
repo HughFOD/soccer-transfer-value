@@ -24,13 +24,13 @@ cp dashboard/scouting_report.html docs/index.html   # publishes to GitHub Pages 
   2025-26 standard/shooting/misc. FBref sits behind Cloudflare: it worked in the user's real Chrome (Claude in Chrome),
   not in the built-in browser. FBref has no xG/xA/passing stats any more.
 
-## Result (v14, 2026-11-20)
+## Result (v15, 2026-11-20)
 
-All 545 Premier League players. 50/50 LightGBM + ridge blend on log value (today's money, 10%/yr inflation),
-value-trajectory and valuation-date features, trained and scored with nested cross-validation over all players:
-median APE 10.4% overall (forwards 13.2%, midfielders 9.3%, defenders 9.1%, goalkeepers 11.9%), 84% within
-±25%, R² (log) 0.97. Naive "previous valuation" baseline: 18.3%. Stats-only model (with FotMob xG and
-defensive stats): 26% median.
+All 545 Premier League players. The full model (50/50 LightGBM + ridge) predicts the change from each player's
+previous Transfermarkt valuation (log ratio), in today's money (10%/yr inflation); players without a previous
+valuation use a level model. Nested cross-validation over all players: median APE 9.3% overall (forwards 10.6%,
+midfielders 8.6%, defenders 8.6%, goalkeepers 10.2%), 84% within ±25%, R² (log) 0.97. Naive "previous valuation"
+baseline: 18.3%. Stats-only model (with FotMob xG and defensive stats): 26% median.
 
 Scripts: `src/allpos.py` (per-position OOF), `src/cmp.py` (feature-set comparison on forwards),
 `src/fotmob.py` (FotMob features). Prediction log: `tracking/`.

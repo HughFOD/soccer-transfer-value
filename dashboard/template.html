@@ -276,7 +276,7 @@ footer{padding:24px 0 50px;font:13px var(--sans);color:var(--faint);border-top:1
 
 <section>
   <h2>Which model won</h2>
-  <p class="muted">Every candidate scored the same way: 5-fold cross-validation, repeated (3 times for all positions, 5 for the forwards comparison), with hyperparameters tuned inside each training fold, so no score has seen its own test players. The first table scores every position; the second compares feature sets on the 153 forwards. All values are in today's money.</p>
+  <p class="muted">Every candidate scored the same way: 5-fold cross-validation, repeated (3 times for all positions, 5 for the forwards comparison), with hyperparameters tuned inside each training fold, so no score has seen its own test players. The first table scores the live model on every position; the second compares feature sets on the 153 forwards, using the earlier version that predicted value directly. All values are in today's money.</p>
   <div class="tablewrap" style="max-height:none;margin-bottom:28px"><table id="bypos"><thead></thead><tbody></tbody></table></div>
   <div class="tablewrap" style="max-height:none"><table id="cmp"><thead></thead><tbody></tbody></table></div>
 </section>
@@ -290,14 +290,14 @@ footer{padding:24px 0 50px;font:13px var(--sans);color:var(--faint);border-top:1
       <p><b>Stats that don't overreact.</b> Per-90 rates pool this season with last season (weighted 0.75) and are shrunk toward the average using a six-match pseudo-sample. A player with two cameo goals can't post an elite rate.</p>
       <p><b>Value trajectory.</b> For each player the model sees his previous Transfermarkt valuation, how long ago it was set, his value 12 months before that, his momentum between the two, and his peak. These are anchored to his own valuation dates. The first version used a fixed "one year ago" date, which hid fast risers: Kroupi went €15m → €22m → €40m → €70m, and the model only saw the €15m. Fixing this cut median error from 23% to 12%.</p>
       <p><b>Inflation.</b> Every past valuation, and every current one set before today, is restated to 16 November 2026 money at 10% a year. That sits between CIES's decade-long Premier League average (about 12% a year) and this summer's record spending growth (about 11%). Testing 0%, 10% and 14% changed accuracy by under a point, because inflation mostly shifts all values together. It matters for reading the numbers: a €40m valuation from 2024 is about €48m today.</p>
-      <p><b>Training.</b> A 50/50 blend of LightGBM and ridge regression on log value, trained on every Premier League player (position flags let it separate roles) and scored on every player with cross-validation. The ridge half lets estimates go above the highest values in the training data. Midfielders (9.3% median error) and defenders (9.1%) are priced more tightly than forwards (13.2%), because their values move less between updates. Repeating each player's previous valuation scores about 18%; the gap is what stats, age, contract and momentum add.</p>
+      <p><b>Training.</b> A 50/50 blend of LightGBM and ridge regression on log value, trained on every Premier League player (position flags let it separate roles) and scored on every player with cross-validation. The model predicts how far each player's value will move from his previous Transfermarkt valuation, rather than his value from scratch. That anchors established stars where Transfermarkt already has them: before this change the model had Declan Rice 21% under and Haaland 26% under; now they are within 5%. It also cut the overall median error from 10.4% to 9.3%. Midfielders (8.6%) and defenders (8.6%) are priced a little more tightly than forwards (10.6%). Repeating each player's previous valuation scores about 18%; the gap is what stats, age, contract and momentum add.</p>
       <p><b>Tested and left out.</b> xG and defensive stats improve the stats-only model (25% → 23% median error for forwards) but not the full one, even for defenders. Transfer-fee and breakout signals didn't help predict sudden re-ratings. League-strength scaling of last season's stats made things slightly worse. Each was tested with the same nested cross-validation.</p>
     </div>
     <div class="prose">
       <p><b>Limits.</b></p>
       <ul>
-        <li><b>Sudden jumps can't be foreseen.</b> The biggest gaps are players Transfermarkt re-rated sharply at their latest update: Hemmings (€0.8m → €15m), Emersonn, Belloumi. Kroupi (−32%) is the clearest case. His value jumped from €40m to €70m in June after a 13-goal season, but he has played 50 minutes this season, so nothing in this season's data backs the jump.</li>
-        <li><b>Top of the market:</b> Haaland is still 19% under, the most valuable player in the data with nobody above him to learn from. The ridge half of the blend limits this.</li>
+        <li><b>Sudden jumps can't be foreseen.</b> The biggest gaps are players Transfermarkt re-rated sharply at their latest update: Hemmings (€0.8m → €15m), Emersonn, Belloumi. Kroupi (about a third under) is the clearest case. His value jumped from €40m to €70m in June after a 13-goal season, but he has played 50 minutes this season, so nothing in this season's data backs the jump.</li>
+        <li><b>Idle stars:</b> a player who hasn't played this season can be priced well under Transfermarkt, which rarely marks established stars down. Saliba (no minutes in 2026-27) is about 30% under.</li>
         <li><b>Goalkeepers on stats alone:</b> the stats-only model is weak for keepers (about 49% median error), so trust the full model's number for them.</li>
         <li><b>Early season:</b> the snapshot is about 11 matchdays in, so last season still carries most of the stats signal.</li>
         <li><b>The target is Transfermarkt's opinion,</b> not a transfer fee. A "gap" means the model and Transfermarkt disagree, not that a deal is a bargain.</li>
@@ -423,7 +423,9 @@ function ridgeLog(model, x){ const r = model.ridge; const z = x.map((v, i) => (v
   r.ind.forEach(i => z.push((x[i] === null || x[i] === undefined || isNaN(x[i])) ? 1 : 0));
   return z.reduce((s, v, i) => s + (v - r.mean[i]) / r.scale[i] * r.coef[i], r.intercept); }
 const lgbLog = (model, x) => model.trees.reduce((s, t) => s + tree(t, x), 0);
-const predict = (model, feat) => { const x = model.features.map(f => feat[f] ?? NaN); return Math.exp(0.5 * lgbLog(model, x) + 0.5 * ridgeLog(model, x)); };
+// The full model predicts the change from the previous valuation (log ratio); the stats-only model predicts the value itself.
+const predict = (model, feat) => { const x = model.features.map(f => feat[f] ?? NaN); const z = 0.5 * lgbLog(model, x) + 0.5 * ridgeLog(model, x);
+  return Math.exp(model.target === "change" ? feat.log_prev_val + z : z); };
 const FULL = DATA.models.full, STATS = DATA.models.stats_only, FN = M.features_union;
 const CLUB = Object.fromEntries(DATA.clubs.map(c => [c.club, c]));
 
@@ -529,7 +531,7 @@ const NICE = {fm_rating:"FotMob match rating", xg_p90:"xG per 90", xa_p90:"xA pe
 function bars(sel, imp){ const top = imp.slice(0, 12), mx = top[0][1];
   $(sel).innerHTML = top.map(([k, v]) => `<div class="bar"><span>${NICE[k] || k}</span><span class="t"><i style="width:${v / mx * 100}%"></i></span><span class="n">${(v * 100).toFixed(1)}%</span></div>`).join(""); }
 bars("#imp_full", FULL.importance); bars("#imp_stats", STATS.importance);
-const FS = {stats_only:"Stats + profile", stats_xg:"Stats + profile + xG and defensive stats", full:"+ wages + value trajectory + valuation date (live model)", full_jump:"+ transfer-fee and breakout signals", full_xg:"+ xG and defensive stats", full_all:"+ both"};
+const FS = {stats_only:"Stats + profile", stats_xg:"Stats + profile + xG and defensive stats", full:"+ wages + value trajectory + valuation date (base for the live model)", full_jump:"+ transfer-fee and breakout signals", full_xg:"+ xG and defensive stats", full_all:"+ both"};
 const MN = {lgbm:"LightGBM", ridge:"Ridge", blend:"50/50 blend"};
 $("#bypos thead").innerHTML = "<tr><th class='l'>Position</th><th>Players</th><th>Median error</th><th>Mean error</th><th>Within ±25%</th><th>R² (log)</th><th>Stats-only median</th><th>Naive baseline</th></tr>";
 $("#bypos tbody").innerHTML = M.by_pos.map(r => `<tr style="cursor:default"><td class="l">${r.label}</td><td>${r.n}</td><td>${r.median_ape.toFixed(1)}%</td><td>${r.mean_ape.toFixed(1)}%</td><td>${r.within_25pct.toFixed(1)}%</td><td>${r.r2_log.toFixed(2)}</td><td>${r.stats.median_ape.toFixed(1)}%</td><td>${r.naive_median_ape.toFixed(1)}%</td></tr>`).join("") +
