@@ -1,6 +1,6 @@
 # Prediction log
 
-`estimates_2026-11-20.csv` freezes every out-of-sample estimate the site showed on 20 Nov 2026 (model v15: predicts the change from each player's previous valuation),
+`estimates_2026-11-20.csv` freezes every out-of-sample estimate the site showed on 20 Nov 2026 (model v16: LightGBM + ridge + Extra Trees, predicting the change from each player's previous valuation),
 before Transfermarkt's next update round. `call` is the model's verdict: **undervalued** (estimate at least 25%
 above Transfermarkt), **overvalued** (at least 25% below) or **fair**.
 

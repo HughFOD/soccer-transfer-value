@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 INTERIM, OUT = ROOT / "data/interim", ROOT / "out"
 df = T.df
 FULL_FS, STATS_FS = "full", "stats_xg"
-oof = pd.read_pickle(INTERIM / f"oof_allpos_{FULL_FS}_change.pkl")   # v15: full model predicts the change from the previous valuation
+oof = pd.read_pickle(INTERIM / f"oof_allpos_{FULL_FS}_change_et.pkl")   # v16: LightGBM + ridge + Extra Trees, change target   # v15: full model predicts the change from the previous valuation
 oof_stats = pd.read_pickle(INTERIM / f"oof_allpos_{STATS_FS}.pkl")
 fwd = np.arange(len(df))                      # every player is scored now
 y = np.log(df.market_value_eur.to_numpy())
@@ -47,7 +47,23 @@ for name, feats in [("full", T.FEATURE_SETS[FULL_FS] + POS3), ("stats_only", T.F
     ridge_exp = {"impute": [float(v) for v in imp_.statistics_], "ind": [int(i) for i in imp_.indicator_.features_],
                  "mean": sc_.mean_.tolist(), "scale": sc_.scale_.tolist(), "coef": rg_.coef_.tolist(),
                  "intercept": float(rg_.intercept_), "alpha": float(rg_.alpha_)}
-    models[name] = {"target": "change" if name == "full" else "level", "features": feats, "params": p, "trees": [slim(t["tree_structure"]) for t in dump["tree_info"]], "ridge": ridge_exp,
+    et_exp = None
+    if name == "full":   # v16: third model, Extra Trees (same settings as src/allpos.py), exported as flat arrays
+        from sklearn.ensemble import ExtraTreesRegressor
+        from sklearn.impute import SimpleImputer
+        from sklearn.pipeline import make_pipeline
+        ep = make_pipeline(SimpleImputer(strategy="median", add_indicator=True),
+                           ExtraTreesRegressor(n_estimators=150, min_samples_leaf=4, max_features=0.5, n_jobs=2, random_state=0)).fit(X, yy)
+        ei, ef = ep.steps[0][1], ep.steps[1][1]
+        trees = []
+        for est in ef.estimators_:
+            t = est.tree_
+            trees.append({"f": t.feature.tolist(), "t": [round(float(v), 6) for v in t.threshold],
+                          "l": t.children_left.tolist(), "r": t.children_right.tolist(),
+                          "v": [round(float(v), 6) for v in t.value[:, 0, 0]]})
+        et_exp = {"impute": [float(v) for v in ei.statistics_], "ind": [int(i) for i in ei.indicator_.features_], "trees": trees,
+                  "check": ep.predict(X.iloc[:5]).tolist()}
+    models[name] = {"et": et_exp, "target": "change" if name == "full" else "level", "features": feats, "params": p, "trees": [slim(t["tree_structure"]) for t in dump["tree_info"]], "ridge": ridge_exp,
                     "importance": [[k, round(float(v), 4)] for k, v in imp.items()],
                     "check": {"x": X.iloc[:5].to_numpy().tolist(), "pred": m.predict(X.iloc[:5]).tolist(),
                               "ridge": rp.predict(X.iloc[:5]).tolist()}}

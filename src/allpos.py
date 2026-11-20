@@ -21,7 +21,14 @@ TARGET = os.environ.get("TARGET", "level")
 base = np.log(df.prev_val.to_numpy()) if TARGET == "change" else np.zeros(len(df))
 has_base = np.isfinite(base)
 base = np.where(has_base, base, 0.0)
-oof = {"lgbm": np.zeros(len(df)), "ridge": np.zeros(len(df))}
+oof = {"lgbm": np.zeros(len(df)), "ridge": np.zeros(len(df)), "et": np.zeros(len(df))}
+USE_ET = os.environ.get("ET", "0") == "1"
+from sklearn.ensemble import ExtraTreesRegressor
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import make_pipeline
+def et():
+    return make_pipeline(SimpleImputer(strategy="median", add_indicator=True),
+                         ExtraTreesRegressor(n_estimators=150, min_samples_leaf=4, max_features=0.5, n_jobs=2, random_state=0))
 for i, (tr, te) in enumerate(RepeatedKFold(n_splits=5, n_repeats=n_rep, random_state=42).split(df)):
     if TARGET == "change":
         trc = tr[has_base[tr]]; yc = y - base
@@ -30,6 +37,10 @@ for i, (tr, te) in enumerate(RepeatedKFold(n_splits=5, n_repeats=n_rep, random_s
         pl = T.lgbm(T.tune(X.iloc[tr].reset_index(drop=True), y[tr], 42 + i)).fit(X.iloc[tr], y[tr])
         pr = T.ridge().fit(X.iloc[tr], y[tr])
         tb = te[has_base[te]]; tn = te[~has_base[te]]
+        if USE_ET:
+            oof["et"][tb] += (base[tb] + et().fit(X.iloc[trc], yc[trc]).predict(X.iloc[tb])) / n_rep
+            if len(tn):
+                oof["et"][tn] += et().fit(X.iloc[tr], y[tr]).predict(X.iloc[tn]) / n_rep
         oof["lgbm"][tb] += (base[tb] + lg.predict(X.iloc[tb])) / n_rep
         oof["ridge"][tb] += (base[tb] + rg.predict(X.iloc[tb])) / n_rep
         if len(tn):
@@ -39,7 +50,7 @@ for i, (tr, te) in enumerate(RepeatedKFold(n_splits=5, n_repeats=n_rep, random_s
     p = T.tune(X.iloc[tr].reset_index(drop=True), y[tr], 42 + i)
     oof["lgbm"][te] += T.lgbm(p).fit(X.iloc[tr], y[tr]).predict(X.iloc[te]) / n_rep
     oof["ridge"][te] += T.ridge().fit(X.iloc[tr], y[tr]).predict(X.iloc[te]) / n_rep
-oof["blend"] = 0.5 * oof["lgbm"] + 0.5 * oof["ridge"]
+oof["blend"] = (oof["lgbm"] + oof["ridge"] + oof["et"]) / 3 if USE_ET else 0.5 * oof["lgbm"] + 0.5 * oof["ridge"]
 rows = []
 for grp in ["FW", "MF", "DF", "GK", "ALL"]:
     m = np.ones(len(df), bool) if grp == "ALL" else (df.pos_group == grp).to_numpy()
@@ -48,7 +59,7 @@ for grp in ["FW", "MF", "DF", "GK", "ALL"]:
 naive = ((df.prev_val - df.market_value_eur).abs() / df.market_value_eur)
 for grp in ["FW", "MF", "DF", "GK"]:
     print(grp, "naive prev-valuation median APE", round(100 * naive[df.pos_group == grp].median(), 1))
-tag = fs + ("_change" if TARGET == "change" else "")
+tag = fs + ("_change" if TARGET == "change" else "") + ("_et" if USE_ET else "")
 for nm in ["Declan Rice", "William Saliba", "Erling Haaland", "Junior Kroupi", "Florian Wirtz", "Bukayo Saka"]:
     i = np.where(df.name.values == nm)[0]
     if len(i):

@@ -247,7 +247,9 @@ def hist_points(h):
 def history_features(h):
     pts = hist_points(h)
     out = dict(mv_date=None, prev_val=np.nan, months_since_prev=np.nan, val_12m_before=np.nan,
-               peak_before=np.nan, momentum_12m=np.nan, mv_1y_ago=np.nan, mv_2y_ago=np.nan, mv_peak_1y_ago=np.nan)
+               peak_before=np.nan, momentum_12m=np.nan, mv_1y_ago=np.nan, mv_2y_ago=np.nan, mv_peak_1y_ago=np.nan,
+               prev2_val=np.nan, months_prev_to_prev2=np.nan, last_step=np.nan, n_vals_24m=0, vol_3y=np.nan,
+               months_since_peak=np.nan, prev_vs_peak=np.nan)
     if not pts:
         return out
     cur_d, _ = pts[-1]
@@ -258,6 +260,19 @@ def history_features(h):
         out["prev_val"] = infl(v, d)
         out["months_since_prev"] = (cur_d - d).days / 30.44
         out["peak_before"] = max(infl(v, d) for d, v in before)
+        # richer history (v16 experiment): the step before last, update cadence, volatility, distance from peak
+        if len(before) >= 2:
+            d2, v2 = before[-2]
+            out["prev2_val"] = infl(v2, d2)
+            out["months_prev_to_prev2"] = (d - d2).days / 30.44
+            out["last_step"] = np.log(out["prev_val"] / out["prev2_val"])
+        out["n_vals_24m"] = sum(1 for dd, _ in before if (cur_d - dd).days <= 730)
+        recent = [(dd, infl(vv, dd)) for dd, vv in before if (cur_d - dd).days <= 3 * 365]
+        steps = [np.log(b2 / b1) / max((d2_ - d1_).days / 365.25, 0.25) for (d1_, b1), (d2_, b2) in zip(recent, recent[1:])]
+        out["vol_3y"] = float(np.std(steps)) if len(steps) >= 2 else np.nan
+        pk_d, pk_v = max(((dd, infl(vv, dd)) for dd, vv in before), key=lambda t: t[1])
+        out["months_since_peak"] = (cur_d - pk_d).days / 30.44
+        out["prev_vs_peak"] = np.log(out["prev_val"] / pk_v)
         anchor = cur_d.replace(year=cur_d.year - 1) if not (cur_d.month == 2 and cur_d.day == 29) else cur_d.replace(year=cur_d.year - 1, day=28)
         old = [(d, v) for d, v in before if d <= anchor]
         if old:
@@ -326,6 +341,7 @@ if TRF.exists():
     df["fee_vs_prev_val"] = np.log((df["last_fee"] + 1e5) / (df["prev_val"] + 1e5))
     df["recent_big_move"] = ((df["months_since_move"] < 18) & (df["last_fee"] > 0)).astype(int)
 df["log_prev_val"] = np.log(df["prev_val"])
+df["log_prev2_val"] = np.log(df["prev2_val"])
 df["log_val_12m_before"] = np.log(df["val_12m_before"])
 df["log_peak_before"] = np.log(df["peak_before"])
 df["log_mv_1y_ago"] = np.log(df["mv_1y_ago"])
