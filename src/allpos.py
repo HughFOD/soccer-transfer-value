@@ -14,6 +14,9 @@ fs = os.environ.get("FS", "full_all")
 n_rep = int(os.environ.get("REPEATS", "3"))
 feats = T.FEATURE_SETS[fs] + ["pos_DF", "pos_MF", "pos_GK"]
 df = T.df
+SUBSET = os.environ.get("SUBSET")            # e.g. "FW,MF": train and score only these position groups
+if SUBSET:
+    df = df[df.pos_group.isin(SUBSET.split(","))].reset_index(drop=True)
 X, y = df[feats], np.log(df.market_value_eur.to_numpy())
 # TARGET=change: learn log(value / previous valuation) where a previous valuation exists, then add it back.
 # Players without one fall back to the level model.
@@ -52,14 +55,14 @@ for i, (tr, te) in enumerate(RepeatedKFold(n_splits=5, n_repeats=n_rep, random_s
     oof["ridge"][te] += T.ridge().fit(X.iloc[tr], y[tr]).predict(X.iloc[te]) / n_rep
 oof["blend"] = (oof["lgbm"] + oof["ridge"] + oof["et"]) / 3 if USE_ET else 0.5 * oof["lgbm"] + 0.5 * oof["ridge"]
 rows = []
-for grp in ["FW", "MF", "DF", "GK", "ALL"]:
+for grp in [g for g in ["FW", "MF", "DF", "GK"] if (df.pos_group == g).any()] + ["ALL"]:
     m = np.ones(len(df), bool) if grp == "ALL" else (df.pos_group == grp).to_numpy()
     rows.append(dict(group=grp, n=int(m.sum()), **T.metrics(y[m], oof["blend"][m])))
     print(rows[-1], flush=True)
 naive = ((df.prev_val - df.market_value_eur).abs() / df.market_value_eur)
-for grp in ["FW", "MF", "DF", "GK"]:
+for grp in [g for g in ["FW", "MF", "DF", "GK"] if (df.pos_group == g).any()]:
     print(grp, "naive prev-valuation median APE", round(100 * naive[df.pos_group == grp].median(), 1))
-tag = fs + ("_change" if TARGET == "change" else "") + ("_et" if USE_ET else "")
+tag = fs + ("_change" if TARGET == "change" else "") + ("_et" if USE_ET else "") + ("_" + SUBSET.replace(",", "") if SUBSET else "")
 for nm in ["Declan Rice", "William Saliba", "Erling Haaland", "Junior Kroupi", "Florian Wirtz", "Bukayo Saka"]:
     i = np.where(df.name.values == nm)[0]
     if len(i):

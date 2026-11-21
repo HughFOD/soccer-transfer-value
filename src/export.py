@@ -117,6 +117,23 @@ def nominal(pid):
     return pv / 1e6, months, (old[-1] / 1e6 if old else None), max(v for _, v in before) / 1e6
 nom = [nominal(i) for i in f["id"]]
 players["prev_nom"], players["prev_months_ago"], players["v12_nom"], players["peak_nom"] = zip(*nom)
+# v18: likely transfer fee = current TM value (today's money) x learned fee/value ratio
+# (ratios were learned against the TM value at the time of each move, so the published value is the like-for-like base) (src/fee.py, 610 real transfers)
+import pickle
+FEE = pickle.load(open(ROOT / "data/interim/fee_model.pkl", "rb"))
+def fee_ratio(val, age, tenure):
+    x = np.c_[np.log(np.minimum(val, FEE["cap"])), age, (age - 25) ** 2, np.clip(tenure, 0, 8),
+              np.ones(len(val)), np.ones(len(val)), np.full(len(val), 2026.9)]   # PL seller, PL buyer, today
+    return (x - FEE["mu"]) / FEE["sd"] @ FEE["coef"] + FEE["b"]
+_ten = f["years_at_club"].fillna(2.5).to_numpy()
+_base = f.market_value_eur.to_numpy()
+_lr = fee_ratio(_base, f.age.to_numpy(), _ten)
+_b = np.where(_base >= 20e6, 1, 0)
+_q = np.array([FEE["bands"]["small"][:2], FEE["bands"]["big"][:2]])[_b]
+players["fee_mid"] = _base * np.exp(_lr)
+players["fee_lo"] = _base * np.exp(_lr + _q[:, 0])
+players["fee_hi"] = _base * np.exp(_lr + _q[:, 1])
+players["years_at_club"] = f["years_at_club"].round(2).to_numpy()
 players["fvec"] = [[None if pd.isna(v) else float(f"{float(v):.5g}") for v in row] for row in f[full_feats].to_numpy()]
 
 # club context for the calculator (from every player at the club)
@@ -159,7 +176,9 @@ site = {
              "naive_within25": round(100 * (ape_naive <= 0.25).mean(), 1),
              "naive_median_ape": round(100 * ape_naive.median(), 1), "naive_mean_ape": round(100 * ape_naive.mean(), 1),
              "max_cur_minutes": float(df.c_minutes.max()), "priors": priors, "medians": med,
-             "max_minutes_cur": float(T.df.min_cur.max()), "median_fvec": med_vec},
+             "max_minutes_cur": float(T.df.min_cur.max()), "median_fvec": med_vec,
+             "fee": {"mu": FEE["mu"].tolist(), "sd": FEE["sd"].tolist(), "coef": FEE["coef"].tolist(), "b": float(FEE["b"]),
+                     "cap": FEE["cap"], "bands": FEE["bands"], "n": FEE["n"], "year": 2026.9}},
     "comparison": comp.to_dict("records"),
     "players": players.to_dict("records"),
     "clubs": club.round(4).to_dict("records"),

@@ -204,7 +204,7 @@ footer{padding:24px 0 50px;font:13px var(--sans);color:var(--faint);border-top:1
     <span class="note" id="count"></span>
   </div>
   <div class="tablewrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
-  <p class="note">Transfermarkt values are restated to 16 Nov 2026 money (most were set between June and October). Prev. value is his previous Transfermarkt valuation, also restated. Gap = (model estimate − Transfermarkt value) ÷ Transfermarkt value. Green: model thinks he's worth more. Red: model thinks he's worth less. "Stats-only" is the same model without any value history, which shows what the on-pitch numbers alone say.</p>
+  <p class="note">Transfermarkt values are restated to 16 Nov 2026 money (most were set between June and October). Prev. value is his previous Transfermarkt valuation, also restated. Gap = (model estimate − Transfermarkt value) ÷ Transfermarkt value. Green: model thinks he's worth more. Red: model thinks he's worth less. "Stats-only" is the same model without any value history, which shows what the on-pitch numbers alone say. Likely fee: what a Premier League club would typically pay, from 610 real transfers (fees ran about 1.25× Transfermarkt value); hover it for the range.</p>
 </section>
 
 <section id="track-record">
@@ -308,16 +308,17 @@ footer{padding:24px 0 50px;font:13px var(--sans);color:var(--faint);border-top:1
       <p><b>Inflation.</b> Every past valuation, and every current one set before today, is restated to 16 November 2026 money at 10% a year. That sits between CIES's decade-long Premier League average (about 12% a year) and this summer's record spending growth (about 11%). Testing 0%, 10% and 14% changed accuracy by under a point, because inflation mostly shifts all values together. It matters for reading the numbers: a €40m valuation from 2024 is about €48m today.</p>
       <p><b>Training.</b> An equal blend of LightGBM, ridge regression and Extra Trees, trained on every Premier League player (position flags let it separate roles) and scored on every player with cross-validation. The model predicts how far each player's value will move from his previous Transfermarkt valuation, rather than his value from scratch. That anchors established stars where Transfermarkt already has them: before this change the model had Declan Rice 21% under and Haaland 26% under; now they are within 5%. It also cut the overall median error from 10.4% to 9.3%. Adding Extra Trees as a third model then cut the big misses: mean error 14.3% → 13.8%, and 86% of players now land within ±25%. Repeating each player's previous valuation scores about 18%; the gap is what stats, age, contract and momentum add.</p>
       <p><b>Young players.</b> Players aged 21 or under are priced by a youth model trained on today's squads plus the three previous summers' Transfermarkt revaluations (2,089 extra player-seasons, weighted 0.3). That cut their median error from 17% to 14%; for older players the past seasons made things slightly worse, so they use today's data only. Both models also see injuries (days out this season and last year, injured now) and youth-international careers.</p>
+      <p><b>Likely fee.</b> Clubs pay more than Transfermarkt's figure. Across 610 permanent transfers since 2021 involving these players, the typical fee was 1.25× the Transfermarkt value at the time. The multiple is higher for cheaper and younger players and for Premier League buyers, and it levels off at about 1.15–1.3× for players worth over €10m. The Likely fee column applies that to each player's current Transfermarkt value, assuming a Premier League buyer; hover a fee for the range that half of real deals fell inside. For players over €30m a flat ×1.25 is as accurate as the fitted multiple (both are typically about 20% off), so treat the fee as a guide, not a quote. It can't see contract length at the time of past deals, which is a big lever in real negotiations.</p>
       <p><b>Tested and left out.</b> xG and defensive stats improve the stats-only model (25% → 23% median error for forwards) but not the full one, even for defenders. Transfer-fee and breakout signals didn't help predict sudden re-ratings. League-strength scaling of last season's stats made things slightly worse. Each was tested with the same nested cross-validation.</p>
     </div>
     <div class="prose">
       <p><b>Limits.</b></p>
       <ul>
         <li><b>Sudden jumps can't be foreseen.</b> The biggest gaps are players Transfermarkt re-rated sharply at their latest update: Hemmings (€0.8m → €15m), Emersonn, Belloumi. Kroupi (about a third under) is the clearest case. His value jumped from €40m to €70m in June after a 13-goal season, but he has played 50 minutes this season, so nothing in this season's data backs the jump.</li>
-        <li><b>Idle stars:</b> a player who hasn't played this season can be priced well under Transfermarkt, which rarely marks established stars down. Saliba (no minutes in 2026-27) is about 30% under.</li>
+        <li><b>Injured stars:</b> a player out for months is marked down, because Transfermarkt cut comparable long-injured players this season (Ekitiké −13%, Simons −22%, Onana −14%). Saliba (back injury since July, no minutes) is about 24% under his €100m valuation. That is a forecast of Transfermarkt's next update, not his price: his Likely fee is about €117m.</li>
         <li><b>Goalkeepers on stats alone:</b> the stats-only model is weak for keepers (about 49% median error), so trust the full model's number for them.</li>
         <li><b>Early season:</b> the snapshot is about 11 matchdays in, so last season still carries most of the stats signal.</li>
-        <li><b>The target is Transfermarkt's opinion,</b> not a transfer fee. A "gap" means the model and Transfermarkt disagree, not that a deal is a bargain.</li>
+        <li><b>The target is Transfermarkt's opinion,</b> not a transfer fee. A "gap" means the model and Transfermarkt disagree, not that a deal is a bargain. The <b>Likely fee</b> column answers the other question: what a club would pay.</li>
         <li><b>Wages</b> are FBref's published estimates and cover most players; the model handles missing wages explicitly.</li>
         <li><b>Leans on Transfermarkt's own history:</b> the previous valuation carries about 70% of the model's split gain. The stats-only model (about 26% median error across positions) shows what on-pitch numbers say alone.</li>
         <li><b>Calculator vs table:</b> the table shows out-of-sample estimates. The calculator uses the final model fitted on everyone, so for a real player it sits closer to his actual value.</li>
@@ -395,6 +396,7 @@ const COLS = [
   ["market_value_eur", "Transfermarkt", "", p => eur(p.market_value_eur)],
   ["pred_full", "Model", "", p => eur(p.pred_full)],
   ["gap_pct", "Gap", "", p => `<span class="pill ${cls(p.gap_pct)}">${pct(p.gap_pct)}</span>`],
+  ["fee_mid", "Likely fee", "", p => `<span title="Likely range ${eur(p.fee_lo)} – ${eur(p.fee_hi)}">${eur(p.fee_mid)}</span>`],
   ["pred_stats", "Stats-only", "", p => eur(p.pred_stats)],
   ["prev_val", "Prev. value", "", p => eur(p.prev_val)],
   ["ga_cur", "G+A 26-27", "", p => (p.c_goals || 0) + (p.c_assists || 0)],
@@ -544,7 +546,9 @@ function inputsFor(p){
     lg: p.prev_season_league, min_p: p.min_prev, st_p: p.starts_prev, g_p: p.p_goals || 0, a_p: p.p_assists || 0, sh_p: p.p_shots || 0, sot_p: p.p_shots_on_target || 0,
     mv1: p.prev_nom ?? "", mon: p.prev_months_ago ?? "", mv2: p.v12_nom ?? "", peak: p.peak_nom ?? ""};
 }
+let feeRef = null; // calculator estimate before any edits, so a real player's fee starts from his Transfermarkt value
 function loadPlayer(i, scroll){
+  feeRef = null;
   if (i < 0){ // typical player (forward medians; the Position field switches the group)
     current = null; base = Object.fromEntries(FN.map((f, j) => [f, M.median_fvec.FW[j] ?? NaN]));
     const med = {age: 24.5, height: 182, foot: "right", role: "CF", caps: 10, igoals: 2, curintl: false, eng: false, club: "Brentford FC", contract: 3.5, yac: 1.5, wage: "",
@@ -556,6 +560,12 @@ function loadPlayer(i, scroll){
   }
   compute();
   if (scroll) $("#calculator").scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start"});
+}
+// likely transfer fee: value x fee/value ratio learned from real transfers (src/fee.py); assumes a Premier League seller and buyer
+function feeAt(val, age, tenure){
+  const F = M.fee, x = [Math.log(Math.min(val, F.cap)), age, (age - 25) ** 2, Math.min(8, Math.max(0, tenure)), 1, 1, F.year];
+  const lr = x.reduce((s, xi, j) => s + (xi - F.mu[j]) / F.sd[j] * F.coef[j], F.b), q = val >= 20e6 ? F.bands.big : F.bands.small;
+  return [val * Math.exp(lr), val * Math.exp(lr + q[0]), val * Math.exp(lr + q[1])];
 }
 function compute(){
   const inp = readInputs(), d1 = derive(inp), feat = {};
@@ -584,6 +594,10 @@ function compute(){
   $("#r_band").style.left = pos(lo) + "%"; $("#r_band").style.width = (pos(hi) - pos(lo)) + "%"; $("#r_mark").style.left = `calc(${pos(v)}% - 1px)`;
   let kv = "";
   if (current) kv += `<span>Transfermarkt today</span><span>${eur(current.market_value_eur)}</span><span>Out-of-sample estimate</span><span>${eur(current.pred_full)}</span>`;
+  if (feeRef === null) feeRef = v;
+  const fbase = current ? current.market_value_eur * v / feeRef : v;
+  const fr = feeAt(fbase, inp.age, current && current.years_at_club != null ? current.years_at_club : 2.5);
+  kv += `<span>${current ? "Likely fee (Transfermarkt value, moved by your edits)" : "Likely fee at this value"}</span><span>${eur(fr[0])} <span class="muted">(${eur(fr[1])} – ${eur(fr[2])})</span></span>`;
   if (useFull) kv += `<span>Change vs previous valuation</span><span>${pct(100 * (v / Math.exp(feat.log_prev_val) - 1))}</span>`;
   kv += `<span>Goals + assists per 90 (pooled)</span><span>${feat.ga_per90.toFixed(2)}</span><span>Minutes, both seasons</span><span>${Math.round(inp.min_c + inp.min_p).toLocaleString()}</span>`;
   $("#r_kv").innerHTML = kv;
