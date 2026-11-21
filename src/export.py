@@ -13,12 +13,23 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent))
 import train as T  # noqa: E402
+import aug_eval as A  # noqa: E402   (v17 youth model: past-season rows + AUG features)
 
 ROOT = Path(__file__).resolve().parents[1]
 INTERIM, OUT = ROOT / "data/interim", ROOT / "out"
-df = T.df
-FULL_FS, STATS_FS = "full", "stats_xg"
-oof = pd.read_pickle(INTERIM / f"oof_allpos_{FULL_FS}_change_et.pkl")   # v16: LightGBM + ridge + Extra Trees, change target   # v15: full model predicts the change from the previous valuation
+CUR, HIST = A.load()
+df = CUR                                         # T.df plus the AUG columns (same rows, same order)
+FULL_FS, STATS_FS = "full_iy", "stats_xg"         # v17: + injury and youth-international features
+oof = pd.read_pickle(INTERIM / f"oof_allpos_{FULL_FS}_change_et.pkl")
+# v17: players aged 21 or under use the youth model (today + past summers weighted 0.3); OOF from src/aug_eval.py
+_c, _y, _res = pd.read_pickle(INTERIM / "aug_eval.pkl")
+_youth_oof = dict(zip(_c["id"].astype(str), _res["E1w0.3"]))
+YOUTH_AGE = 21
+for k in ("lgbm", "ridge", "et", "blend"):
+    oof[k] = oof[k].copy()
+_ym = ((df.age <= YOUTH_AGE) & df["id"].astype(str).isin(_youth_oof)).to_numpy()
+oof["blend"][_ym] = [_youth_oof[i] for i in df["id"].astype(str)[_ym]]
+df["model_used"] = np.where(_ym, "youth", np.where(df.prev_val.notna(), "full", "level"))
 oof_stats = pd.read_pickle(INTERIM / f"oof_allpos_{STATS_FS}.pkl")
 fwd = np.arange(len(df))                      # every player is scored now
 y = np.log(df.market_value_eur.to_numpy())
@@ -26,13 +37,18 @@ CHOSEN = "blend"   # 50/50 LightGBM + ridge on log value
 
 POS3 = ["pos_DF", "pos_MF", "pos_GK"]
 models = {}
-for name, feats in [("full", T.FEATURE_SETS[FULL_FS] + POS3), ("stats_only", T.FEATURE_SETS[STATS_FS] + POS3)]:
+for name, feats in [("full", T.FEATURE_SETS[FULL_FS] + POS3), ("youth", A.AUG), ("stats_only", T.FEATURE_SETS[STATS_FS] + POS3)]:
     X, yy = df[feats], np.log(df.market_value_eur.to_numpy())
-    if name == "full":   # learn log(value / previous valuation) on players that have one
+    W = None
+    if name in ("full", "youth"):   # learn log(value / previous valuation) on players that have one
         has = df.prev_val.notna().to_numpy()
         X, yy = X[has], yy[has] - np.log(df.prev_val.to_numpy()[has])
-    p = T.tune(X, yy, seed=7)
-    m = T.lgbm(p).fit(X, yy)
+    if name == "youth":             # plus the past-season snapshots, weighted 0.3
+        X = pd.concat([X, HIST[feats]])
+        yy = np.concatenate([yy, np.log(HIST.market_value_eur.to_numpy()) - np.log(HIST.prev_val.to_numpy())])
+        W = np.concatenate([np.ones(int(has.sum())), np.full(len(HIST), 0.3)])
+    p = T.tune(X.reset_index(drop=True), yy, seed=7)
+    m = T.lgbm(p).fit(X, yy, **({} if W is None else {"sample_weight": W}))
     imp = pd.Series(m.booster_.feature_importance("gain"), index=feats)
     imp = (imp / imp.sum()).sort_values(ascending=False)
     dump = m.booster_.dump_model()
@@ -40,30 +56,30 @@ for name, feats in [("full", T.FEATURE_SETS[FULL_FS] + POS3), ("stats_only", T.F
     def slim(node):
         if "leaf_value" in node:
             return {"v": node["leaf_value"]}
-        return {"f": node["split_feature"], "t": node["threshold"], "dl": node["default_left"],
+        return {"f": node["split_feature"], "t": node["threshold"], "dl": node["default_left"], "iv": node.get("internal_value", 0.0),
                 "mt": node["missing_type"], "l": slim(node["left_child"]), "r": slim(node["right_child"])}
-    rp = T.ridge().fit(X, yy)
+    rp = T.ridge().fit(X, yy, **({} if W is None else {"ridgecv__sample_weight": W}))
     imp_, sc_, rg_ = rp.steps[0][1], rp.steps[1][1], rp.steps[2][1]
     ridge_exp = {"impute": [float(v) for v in imp_.statistics_], "ind": [int(i) for i in imp_.indicator_.features_],
                  "mean": sc_.mean_.tolist(), "scale": sc_.scale_.tolist(), "coef": rg_.coef_.tolist(),
                  "intercept": float(rg_.intercept_), "alpha": float(rg_.alpha_)}
     et_exp = None
-    if name == "full":   # v16: third model, Extra Trees (same settings as src/allpos.py), exported as flat arrays
+    if name in ("full", "youth"):   # v16: third model, Extra Trees (same settings as src/allpos.py), exported as flat arrays
         from sklearn.ensemble import ExtraTreesRegressor
         from sklearn.impute import SimpleImputer
         from sklearn.pipeline import make_pipeline
         ep = make_pipeline(SimpleImputer(strategy="median", add_indicator=True),
-                           ExtraTreesRegressor(n_estimators=150, min_samples_leaf=4, max_features=0.5, n_jobs=2, random_state=0)).fit(X, yy)
+                           ExtraTreesRegressor(n_estimators=150, min_samples_leaf=4, max_features=0.5, n_jobs=2, random_state=0)).fit(X, yy, **({} if W is None else {"extratreesregressor__sample_weight": W}))
         ei, ef = ep.steps[0][1], ep.steps[1][1]
         trees = []
         for est in ef.estimators_:
             t = est.tree_
-            trees.append({"f": t.feature.tolist(), "t": [round(float(v), 6) for v in t.threshold],
+            trees.append({"f": t.feature.tolist(), "t": [round(float(v), 4) for v in t.threshold],
                           "l": t.children_left.tolist(), "r": t.children_right.tolist(),
-                          "v": [round(float(v), 6) for v in t.value[:, 0, 0]]})
+                          "v": [round(float(v), 4) for v in t.value[:, 0, 0]]})
         et_exp = {"impute": [float(v) for v in ei.statistics_], "ind": [int(i) for i in ei.indicator_.features_], "trees": trees,
                   "check": ep.predict(X.iloc[:5]).tolist()}
-    models[name] = {"et": et_exp, "target": "change" if name == "full" else "level", "features": feats, "params": p, "trees": [slim(t["tree_structure"]) for t in dump["tree_info"]], "ridge": ridge_exp,
+    models[name] = {"et": et_exp, "target": "change" if name in ("full", "youth") else "level", "features": feats, "params": p, "trees": [slim(t["tree_structure"]) for t in dump["tree_info"]], "ridge": ridge_exp,
                     "importance": [[k, round(float(v), 4)] for k, v in imp.items()],
                     "check": {"x": X.iloc[:5].to_numpy().tolist(), "pred": m.predict(X.iloc[:5]).tolist(),
                               "ridge": rp.predict(X.iloc[:5]).tolist()}}
@@ -80,10 +96,10 @@ cols = ["name", "club", "position", "age", "market_value_eur", "pred_full", "pre
         "starts_cur", "starts_prev", "c_shots", "p_shots", "c_shots_on_target", "p_shots_on_target",
         "years_at_club", "years_since_extension", "senior_intl", "current_intl", "english", "intl_goals",
         "mv_2y_ago", "is_winger", "actual_value_reported", "prev_val", "months_since_prev", "val_12m_before",
-        "peak_before", "mv_date", "pos_group", "xg_p90", "xa_p90", "def_contrib_p90", "fm_rating"]
+        "peak_before", "mv_date", "model_used", "injured_now", "days_out_season", "youth_caps", "pos_group", "xg_p90", "xa_p90", "def_contrib_p90", "fm_rating"]
 players = f[cols].astype(object).where(f[cols].notna(), None)
 players["age"] = players["age"].map(lambda a: round(a, 1))
-full_feats = list(dict.fromkeys(models["full"]["features"] + models["stats_only"]["features"]))   # union for the calculator
+full_feats = list(dict.fromkeys(models["full"]["features"] + models["stats_only"]["features"] + models["youth"]["features"]))   # union for the calculator
 # nominal (as-published) history for the calculator inputs
 from datetime import date as _date
 raw = {str(r["id"]): r["mvh"] for r in json.load(open(ROOT / "data/raw/transfermarkt_2026.json"))}
@@ -101,7 +117,7 @@ def nominal(pid):
     return pv / 1e6, months, (old[-1] / 1e6 if old else None), max(v for _, v in before) / 1e6
 nom = [nominal(i) for i in f["id"]]
 players["prev_nom"], players["prev_months_ago"], players["v12_nom"], players["peak_nom"] = zip(*nom)
-players["fvec"] = [[None if pd.isna(v) else round(float(v), 5) for v in row] for row in f[full_feats].to_numpy()]
+players["fvec"] = [[None if pd.isna(v) else float(f"{float(v):.5g}") for v in row] for row in f[full_feats].to_numpy()]
 
 # club context for the calculator (from every player at the club)
 club = df.groupby("club").agg(club_log_mv=("log_mv", "mean"), team_gd_per90=("team_gd_per90", "median"),
@@ -133,7 +149,11 @@ for g, label in [("FW", "Forwards"), ("MF", "Midfielders"), ("DF", "Defenders"),
                        stats=T.metrics(y[m], oof_stats[CHOSEN][m]), naive_median_ape=round(100 * nv.median(), 1)))
 site = {
     "meta": {"snapshot": "2026-11-16", "n_players": int(len(f)), "n_training": int(len(df)), "by_pos": by_pos,
-             "features_union": full_feats, "logged": "2026-11-20",
+             "features_union": full_feats, "logged": "2026-11-20", "youth_age": YOUTH_AGE,
+             # walk-forward test (src/aug_eval.py): trained only on earlier summers, predicting a later summer
+             "walk_forward": [
+                 {"train": "summer 2024", "test": "summer 2025", "n": 695, "model": {"median": 10.5, "mean": 14.6, "within25": 83.2}, "naive": {"median": 14.8, "mean": 18.7, "within25": 71.1}},
+                 {"train": "summers 2024-25", "test": "summer 2026", "n": 679, "model": {"median": 9.4, "mean": 13.5, "within25": 83.9}, "naive": {"median": 16.3, "mean": 20.4, "within25": 66.9}}],
              "metrics": T.metrics(y, oof[CHOSEN]), "metrics_stats": T.metrics(y, oof_stats[CHOSEN]),
              "inflation": 0.10, "naive1y_median_ape": round(100 * ape_naive1y.median(), 1), "naive1y_mean_ape": round(100 * ape_naive1y.mean(), 1),
              "naive_within25": round(100 * (ape_naive <= 0.25).mean(), 1),

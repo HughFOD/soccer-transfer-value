@@ -13,4 +13,8 @@ The scraped inputs live outside the repo. To rebuild, place these in `data/raw/`
   2026-27 PL and 2025-26 for 16 leagues, from data.fotmob.com stat lists.
 - `transfermarkt_transfers_2026.json` - every transfer and fee for the 547 players (`/ceapi/transferHistory/list/<id>`).
 
+- `transfermarkt_extra_2026.json` - TM squads for 2023-24 to 2026-27, plus injury histories, national-team careers
+  (`tmapi.transfermarkt.technology/player/<id>/national-career-history`) and value histories for 1,523 players.
+- `fotmob_hist.json` - FotMob stats for 2022-23 to 2024-25 (Turkey, Brazil and MLS missing).
+
 Then run the pipeline in the top-level README. `data/interim/` and `out/` are generated.

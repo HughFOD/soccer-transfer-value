@@ -47,6 +47,8 @@ STATS = ["min_cur", "min_prev", "starts_cur", "starts_prev", "minutes_share_cur"
          "sot_per90", "g_per_sh", "fouled_per90", "crs_per90", "int_per90", "tklw_per90",
          "fls_per90", "offsides_per90", "cards_per90", "ga_cur", "ga_prev", "experience_score"]
 WAGE = ["log_wage", "has_wage"]
+INJ = ["injured_now", "days_out_365", "days_out_season", "n_injuries_2y", "longest_injury_2y"]
+YOUTH = ["youth_caps", "youth_levels", "nat_debut_age", "recent_national"]
 HIST2 = ["log_prev2_val", "months_prev_to_prev2", "last_step", "n_vals_24m", "vol_3y", "months_since_peak", "prev_vs_peak"]
 JUMP = ["log_last_fee", "log_max_fee", "fee_vs_prev_val", "months_since_move", "recent_big_move", "last_move_loan",
         "n_moves_3y", "youth_promotion", "form_jump", "recent_extension"]
@@ -61,6 +63,8 @@ FEATURE_SETS = {
     "stats_wage": PROFILE + CLUB + STATS + WAGE,
     "full": PROFILE + CLUB + STATS + WAGE + HISTORY,
     "full_calendar": PROFILE + CLUB + STATS + WAGE + HISTORY_CAL,
+    "full_iy": PROFILE + CLUB + STATS + WAGE + HISTORY + INJ + YOUTH,
+    "full_inj": PROFILE + CLUB + STATS + WAGE + HISTORY + INJ,
     "full_hist2": PROFILE + CLUB + STATS + WAGE + HISTORY + HIST2,
     "full_jump": PROFILE + CLUB + STATS + WAGE + HISTORY + JUMP,
     "full_xg": PROFILE + CLUB + STATS + WAGE + HISTORY + XG + DEF,

@@ -450,6 +450,11 @@ from fotmob import fotmob_features  # noqa: E402
 _fm = fotmob_features(df)
 if _fm is not None:
     df = pd.concat([df, _fm], axis=1)
+# Injuries and youth internationals (Transfermarkt; see src/extras.py), as of today, season from 1 Aug 2026
+from extras import injury_youth_features  # noqa: E402
+_iy = injury_youth_features(df["id"], df["dob"], df["international_caps"], TODAY, date(2026, 8, 1))
+_iy.index = df.index
+df = pd.concat([df, _iy], axis=1)
 df["is_forward"] = fwd_mask.astype(int)
 drop = ["mvh", "href", "dob_age", "info"]
 df.drop(columns=[c for c in drop if c in df], inplace=True)

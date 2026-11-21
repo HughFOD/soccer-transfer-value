@@ -23,7 +23,7 @@ COUNT_STATS = {
     "total_tackle": "tackles", "interception": "fm_int", "effective_clearance": "clearances",
     "outfielder_block": "blocks", "ball_recovery": "recoveries", "poss_won_att_3rd": "press_wins",
     "defensive_contributions": "def_contrib", "accurate_pass": "passes", "accurate_long_balls": "long_balls",
-    "goals": "fm_goals",
+    "goals": "fm_goals", "goal_assist": "fm_assists",
 }
 # FotMob publishes these as per-90 rates (checked: Mazraoui total_tackle 2.7 over 233 min; Saka accurate_pass 27.4);
 # the rest are season totals. Per-90 ones are turned back into totals (x minutes / 90) before pooling seasons.
@@ -50,16 +50,24 @@ def _frame(entry):
     return pd.DataFrame(rows)
 
 
-def fotmob_features(tm):
-    path = RAW / "fotmob_2026.json"
-    if not path.exists():
+CALENDAR = {"allsvenskan", "brazil", "mls"}
+
+
+def fotmob_features(tm, fm=None, cur_key="premier_league|2026/2027", prev_seasons=("2025/2026", "2025")):
+    if fm is None:
+        path = RAW / "fotmob_2026.json"
+        if not path.exists():
+            return None
+        fm = json.load(open(path))
+    if cur_key not in fm:
         return None
-    fm = json.load(open(path))
-    cur = _frame(fm["premier_league|2026/2027"])
+    cur = _frame(fm[cur_key])
     prev_parts = []
     for key, entry in fm.items():
         lg, season = key.split("|")
-        if season in ("2025/2026", "2025"):
+        if ("/" in season) == (lg in CALENDAR):   # calendar leagues use "2025", the rest "2025/2026"
+            continue
+        if season in prev_seasons:
             f = _frame(entry)
             f["league"] = lg
             prev_parts.append(f)
@@ -129,4 +137,7 @@ def fotmob_features(tm):
     num = r_c.fillna(0) * w_c + r_p.fillna(0) * w_p
     feats["fm_rating"] = np.where(has, (num + 6.7 * 540) / (w_c + w_p + 540), np.nan)  # shrunk to a 6.7 average
     feats["fm_matched"] = has.astype(int)
+    feats["fm_min_cur"] = min_c.where(has)
+    feats["fm_min_prev"] = min_p.where(has)
+    feats["fm_prev_league"] = get(p, "league")
     return pd.concat([out, feats], axis=1)
