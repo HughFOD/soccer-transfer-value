@@ -59,9 +59,12 @@ def fotmob_features(tm, fm=None, cur_key="premier_league|2026/2027", prev_season
         if not path.exists():
             return None
         fm = json.load(open(path))
-    if cur_key not in fm:
+    keys = [cur_key] if isinstance(cur_key, str) else list(cur_key)
+    if not all(k in fm for k in keys):
         return None
-    cur = _frame(fm[cur_key])
+    cur = pd.concat([_frame(fm[k]) for k in keys], ignore_index=True)
+    # a player listed in two leagues this season: keep the row with more minutes
+    cur = cur.sort_values("min", ascending=False).drop_duplicates("fm_id").reset_index(drop=True)
     prev_parts = []
     for key, entry in fm.items():
         lg, season = key.split("|")

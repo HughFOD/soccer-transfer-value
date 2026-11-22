@@ -58,12 +58,22 @@ DEF = ["tackles_p90", "fm_int_p90", "clearances_p90", "blocks_p90", "recoveries_
 HISTORY_CAL = ["log_mv_1y_ago", "log_mv_peak_1y_ago", "mv_trend_prev_year", "n_valuations"]   # Round 7 v11: anchored to today
 HISTORY = ["months_since_valuation", "log_prev_val", "months_since_prev", "log_val_12m_before", "momentum_12m", "log_peak_before", "n_valuations"]
 
+# v19: league of the current club (only varies when trained on all Big-5 leagues; BIG5=1 dataset)
+LEAGUE = ["lg_ES1", "lg_L1", "lg_IT1", "lg_FR1", "league_gap"]
+for _c in LEAGUE:
+    if _c not in df:
+        df[_c] = 0.0
+if "league" not in df:
+    df["league"] = "GB1"
+
 FEATURE_SETS = {
     "stats_only": PROFILE + CLUB + STATS,
     "stats_wage": PROFILE + CLUB + STATS + WAGE,
     "full": PROFILE + CLUB + STATS + WAGE + HISTORY,
     "full_calendar": PROFILE + CLUB + STATS + WAGE + HISTORY_CAL,
     "full_iy": PROFILE + CLUB + STATS + WAGE + HISTORY + INJ + YOUTH,
+    "full_iy_lg": PROFILE + CLUB + LEAGUE + STATS + WAGE + HISTORY + INJ + YOUTH,
+    "stats_xg_lg": PROFILE + CLUB + LEAGUE + STATS + XG + DEF,
     "full_inj": PROFILE + CLUB + STATS + WAGE + HISTORY + INJ,
     "full_hist2": PROFILE + CLUB + STATS + WAGE + HISTORY + HIST2,
     "full_jump": PROFILE + CLUB + STATS + WAGE + HISTORY + JUMP,
@@ -74,6 +84,8 @@ FEATURE_SETS = {
 }
 GRID = {"n_estimators": [300, 600], "learning_rate": [0.03, 0.06],
         "num_leaves": [4, 8], "min_child_samples": [6, 12]}
+if os.environ.get("BIGGRID") == "1":   # v19: more data supports bigger trees
+    GRID = {"n_estimators": [600, 1200], "learning_rate": [0.03], "num_leaves": [8, 16, 31], "min_child_samples": [10, 25]}
 BASE = dict(subsample=0.8, subsample_freq=1, colsample_bytree=0.7, reg_lambda=1.0, verbose=-1)
 
 

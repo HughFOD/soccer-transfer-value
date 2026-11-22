@@ -19,25 +19,51 @@ ROOT = Path(__file__).resolve().parents[1]
 INTERIM, OUT = ROOT / "data/interim", ROOT / "out"
 CUR, HIST = A.load()
 df = CUR                                         # T.df plus the AUG columns (same rows, same order)
-FULL_FS, STATS_FS = "full_iy", "stats_xg"         # v17: + injury and youth-international features
-oof = pd.read_pickle(INTERIM / f"oof_allpos_{FULL_FS}_change_et.pkl")
+import os
+# v19: env-driven so the five-league build (INPUT=players_b5.csv HIST=hist_rows_b5.csv) shares this script
+FULL_FS = os.environ.get("FULL_FS", "full_iy")       # v17: + injury and youth-international features
+STATS_FS = os.environ.get("STATS_FS", "stats_xg")
+TAGS = "_" + os.environ["TAG"] if os.environ.get("TAG") else ""
+oof = pd.read_pickle(INTERIM / f"oof_allpos_{FULL_FS}_change_et{os.environ.get('FULL_TAG', TAGS)}.pkl")
 # v17: players aged 21 or under use the youth model (today + past summers weighted 0.3); OOF from src/aug_eval.py
-_c, _y, _res = pd.read_pickle(INTERIM / "aug_eval.pkl")
-_youth_oof = dict(zip(_c["id"].astype(str), _res["E1w0.3"]))
-YOUTH_AGE = 21
+V19 = os.environ.get("V19") == "1"
 for k in ("lgbm", "ridge", "et", "blend"):
     oof[k] = oof[k].copy()
-_ym = ((df.age <= YOUTH_AGE) & df["id"].astype(str).isin(_youth_oof)).to_numpy()
-oof["blend"][_ym] = [_youth_oof[i] for i in df["id"].astype(str)[_ym]]
-df["model_used"] = np.where(_ym, "youth", np.where(df.prev_val.notna(), "full", "level"))
-oof_stats = pd.read_pickle(INTERIM / f"oof_allpos_{STATS_FS}.pkl")
+if V19:
+    # v19: one model trained on all five leagues (past seasons and the youth model no longer helped: src/aug_eval.py).
+    # Premier League players: 50/50 average with the v17 Premier League-only estimate (out-of-fold, same players):
+    # PL median error 9.1% (v17) / 9.4% (five leagues) -> 8.5% averaged; mean 13.7 / 13.8 -> 13.4.
+    YOUTH_AGE = -1
+    v17 = pd.read_csv(INTERIM / "players_all.csv", low_memory=False)
+    v17 = v17[v17.market_value_eur.notna()].reset_index(drop=True)
+    o17 = pd.read_pickle(INTERIM / "oof_allpos_full_iy_change_et.pkl")["blend"].copy()
+    _c, _y, _res = pd.read_pickle(INTERIM / "aug_eval.pkl")
+    _yd = dict(zip(_c["id"].astype(str), _res["E1w0.3"]))
+    _m = ((v17.age <= 21) & v17["id"].astype(str).isin(_yd)).to_numpy()
+    o17[_m] = [_yd[i] for i in v17["id"].astype(str)[_m]]
+    pl17 = dict(zip(v17["id"].astype(str), o17))
+    _pl = (df.league == "GB1").to_numpy() & df["id"].astype(str).isin(pl17).to_numpy()
+    oof["blend"][_pl] = 0.5 * oof["blend"][_pl] + 0.5 * np.array([pl17[i] for i in df["id"].astype(str)[_pl]])
+    df["model_used"] = np.where(_pl, "full+pl", np.where(df.prev_val.notna(), "full", "level"))
+else:
+    _c, _y, _res = pd.read_pickle(INTERIM / f"aug_eval{TAGS}.pkl")
+    _youth_oof = dict(zip(_c["id"].astype(str), _res["E1w0.3"]))
+    YOUTH_AGE = 21
+    _ym = ((df.age <= YOUTH_AGE) & df["id"].astype(str).isin(_youth_oof)).to_numpy()
+    oof["blend"][_ym] = [_youth_oof[i] for i in df["id"].astype(str)[_ym]]
+    df["model_used"] = np.where(_ym, "youth", np.where(df.prev_val.notna(), "full", "level"))
+YOUTH_W = 0.3
+oof_stats = pd.read_pickle(INTERIM / f"oof_allpos_{STATS_FS}{TAGS}.pkl")
 fwd = np.arange(len(df))                      # every player is scored now
 y = np.log(df.market_value_eur.to_numpy())
 CHOSEN = "blend"   # 50/50 LightGBM + ridge on log value
 
 POS3 = ["pos_DF", "pos_MF", "pos_GK"]
 models = {}
-for name, feats in [("full", T.FEATURE_SETS[FULL_FS] + POS3), ("youth", A.AUG), ("stats_only", T.FEATURE_SETS[STATS_FS] + POS3)]:
+_specs = [("full", T.FEATURE_SETS[FULL_FS] + POS3), ("youth", A.AUG), ("stats_only", T.FEATURE_SETS[STATS_FS] + POS3)]
+if V19:
+    _specs = [x for x in _specs if x[0] != "youth"]
+for name, feats in _specs:
     X, yy = df[feats], np.log(df.market_value_eur.to_numpy())
     W = None
     if name in ("full", "youth"):   # learn log(value / previous valuation) on players that have one
@@ -46,7 +72,7 @@ for name, feats in [("full", T.FEATURE_SETS[FULL_FS] + POS3), ("youth", A.AUG), 
     if name == "youth":             # plus the past-season snapshots, weighted 0.3
         X = pd.concat([X, HIST[feats]])
         yy = np.concatenate([yy, np.log(HIST.market_value_eur.to_numpy()) - np.log(HIST.prev_val.to_numpy())])
-        W = np.concatenate([np.ones(int(has.sum())), np.full(len(HIST), 0.3)])
+        W = np.concatenate([np.ones(int(has.sum())), np.full(len(HIST), YOUTH_W)])
     p = T.tune(X.reset_index(drop=True), yy, seed=7)
     m = T.lgbm(p).fit(X, yy, **({} if W is None else {"sample_weight": W}))
     imp = pd.Series(m.booster_.feature_importance("gain"), index=feats)
@@ -96,10 +122,10 @@ cols = ["name", "club", "position", "age", "market_value_eur", "pred_full", "pre
         "starts_cur", "starts_prev", "c_shots", "p_shots", "c_shots_on_target", "p_shots_on_target",
         "years_at_club", "years_since_extension", "senior_intl", "current_intl", "english", "intl_goals",
         "mv_2y_ago", "is_winger", "actual_value_reported", "prev_val", "months_since_prev", "val_12m_before",
-        "peak_before", "mv_date", "model_used", "injured_now", "days_out_season", "youth_caps", "pos_group", "xg_p90", "xa_p90", "def_contrib_p90", "fm_rating"]
+        "peak_before", "mv_date", "model_used", "injured_now", "days_out_season", "youth_caps", "pos_group", "xg_p90", "xa_p90", "def_contrib_p90", "fm_rating", "league"]
 players = f[cols].astype(object).where(f[cols].notna(), None)
 players["age"] = players["age"].map(lambda a: round(a, 1))
-full_feats = list(dict.fromkeys(models["full"]["features"] + models["stats_only"]["features"] + models["youth"]["features"]))   # union for the calculator
+full_feats = list(dict.fromkeys(sum((m["features"] for m in models.values()), [])))   # union for the calculator
 # nominal (as-published) history for the calculator inputs
 from datetime import date as _date
 raw = {str(r["id"]): r["mvh"] for r in json.load(open(ROOT / "data/raw/transfermarkt_2026.json"))}
@@ -121,13 +147,13 @@ players["prev_nom"], players["prev_months_ago"], players["v12_nom"], players["pe
 # (ratios were learned against the TM value at the time of each move, so the published value is the like-for-like base) (src/fee.py, 610 real transfers)
 import pickle
 FEE = pickle.load(open(ROOT / "data/interim/fee_model.pkl", "rb"))
-def fee_ratio(val, age, tenure):
+def fee_ratio(val, age, tenure, seller_pl):
     x = np.c_[np.log(np.minimum(val, FEE["cap"])), age, (age - 25) ** 2, np.clip(tenure, 0, 8),
-              np.ones(len(val)), np.ones(len(val)), np.full(len(val), 2026.9)]   # PL seller, PL buyer, today
+              np.ones(len(val)), seller_pl, np.full(len(val), 2026.9)]   # PL buyer, seller's league, today
     return (x - FEE["mu"]) / FEE["sd"] @ FEE["coef"] + FEE["b"]
 _ten = f["years_at_club"].fillna(2.5).to_numpy()
 _base = f.market_value_eur.to_numpy()
-_lr = fee_ratio(_base, f.age.to_numpy(), _ten)
+_lr = fee_ratio(_base, f.age.to_numpy(), _ten, (f.league == "GB1").astype(float).to_numpy())
 _b = np.where(_base >= 20e6, 1, 0)
 _q = np.array([FEE["bands"]["small"][:2], FEE["bands"]["big"][:2]])[_b]
 players["fee_mid"] = _base * np.exp(_lr)
@@ -137,7 +163,7 @@ players["years_at_club"] = f["years_at_club"].round(2).to_numpy()
 players["fvec"] = [[None if pd.isna(v) else float(f"{float(v):.5g}") for v in row] for row in f[full_feats].to_numpy()]
 
 # club context for the calculator (from every player at the club)
-club = df.groupby("club").agg(club_log_mv=("log_mv", "mean"), team_gd_per90=("team_gd_per90", "median"),
+club = df.groupby("club").agg(league=("league", "first"), club_log_mv=("log_mv", "mean"), team_gd_per90=("team_gd_per90", "median"),
                               ppg_cur=("ppg_cur", "median"), n=("name", "size")).reset_index()
 fw = df[df.is_forward == 1]
 nine = fw.c_minutes_90s.fillna(0) + T_W if (T_W := 0.75) else None
@@ -175,7 +201,12 @@ site = {
              "inflation": 0.10, "naive1y_median_ape": round(100 * ape_naive1y.median(), 1), "naive1y_mean_ape": round(100 * ape_naive1y.mean(), 1),
              "naive_within25": round(100 * (ape_naive <= 0.25).mean(), 1),
              "naive_median_ape": round(100 * ape_naive.median(), 1), "naive_mean_ape": round(100 * ape_naive.mean(), 1),
-             "max_cur_minutes": float(df.c_minutes.max()), "priors": priors, "medians": med,
+             "max_cur_minutes": float(df.c_minutes.max()),
+             "max_min_by_league": {k: float(v) for k, v in df.groupby("league").min_cur.max().items()},
+             "league_gap": {"GB1": 0.0, "ES1": 5.6, "IT1": 5.6, "L1": 6.3, "FR1": 7.1},
+             "by_league": [dict(league=lg, n=int((df.league == lg).sum()), **T.metrics(y[(df.league == lg).to_numpy()], oof[CHOSEN][(df.league == lg).to_numpy()]),
+                                naive_median_ape=round(100 * ((df.prev_val - df.market_value_eur).abs() / df.market_value_eur)[df.league == lg].median(), 1))
+                           for lg in ["GB1", "ES1", "L1", "IT1", "FR1"] if (df.league == lg).any()], "priors": priors, "medians": med,
              "max_minutes_cur": float(T.df.min_cur.max()), "median_fvec": med_vec,
              "fee": {"mu": FEE["mu"].tolist(), "sd": FEE["sd"].tolist(), "coef": FEE["coef"].tolist(), "b": float(FEE["b"]),
                      "cap": FEE["cap"], "bands": FEE["bands"], "n": FEE["n"], "year": 2026.9}},

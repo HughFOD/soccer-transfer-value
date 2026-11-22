@@ -58,6 +58,11 @@ def money(s):
 
 # ---------------------------------------------------------------- FBref
 fb = json.load(open(RAW / "fbref_2026.json"))
+import os
+# v19: BIG5=1 adds La Liga, Bundesliga, Serie A and Ligue 1 players (src/convert_big5.py makes the inputs)
+BIG5 = os.environ.get("BIG5", "0") == "1" and (RAW / "fbref_big5_2026.json").exists()
+if BIG5:
+    fb.update(json.load(open(RAW / "fbref_big5_2026.json")))
 
 
 def fb_frame(key):
@@ -107,7 +112,7 @@ def season_table(prefix, kinds):
     return out
 
 
-cur = season_table("pl27", ["standard", "shooting", "misc", "playingtime"])
+cur = season_table("b527" if BIG5 else "pl27", ["standard", "shooting", "misc", "playingtime"])
 prev = season_table("b5", ["standard", "shooting", "misc"])          # all Big-5 leagues 2025-26
 # Last-season stats from leagues outside the Big 5 (Championship for the promoted clubs, Portugal, NL, ...)
 OTHER = RAW / "fbref_other_2026.json"
@@ -129,10 +134,10 @@ if OTHER.exists():
     other_prev = other_prev.groupby("fbref_id").agg({**{c: "sum" for c in num_cols}, "player": "first", "team": "first",
                                                      "position": "first", "birth_year": "first",
                                                      "comp_level": lambda s: " / ".join(dict.fromkeys(s))}).reset_index()
-prev_pt = season_table("pl26", ["playingtime"])[["fbref_id", "on_goals_for", "on_goals_against", "minutes"]]
+prev_pt = season_table("b526" if BIG5 else "pl26", ["playingtime"])[["fbref_id", "on_goals_for", "on_goals_against", "minutes"]]
 prev_pt = prev_pt.rename(columns={"on_goals_for": "pl26_on_gf", "on_goals_against": "pl26_on_ga", "minutes": "pl26_pt_min"})
 
-wages = fb_frame("pl27_wages")
+wages = pd.concat([fb_frame(k) for k in fb if k.endswith("_wages")], ignore_index=True)
 wages["annual_wage_eur"] = wages["annual_wages"].map(num)
 wages = wages.groupby("fbref_id", as_index=False)["annual_wage_eur"].max()
 
@@ -146,12 +151,16 @@ for key in fb:
 ident = pd.concat(ident)
 ident_by_id = (ident.sort_values("birth_year").groupby("fbref_id")
                .agg(fb_name=("fb_name", "first"), birth_year=("birth_year", "first"),
-                    fb_teams=("fb_team", lambda s: set(s)), in_pl27=("src", lambda s: any(x.startswith("pl27") for x in s)))
+                    fb_teams=("fb_team", lambda s: set(s)), in_pl27=("src", lambda s: any(x.startswith(("pl27", "b527")) for x in s)))
                .reset_index())
 ident_by_id["n"] = ident_by_id["fb_name"].map(norm)
 
 # ---------------------------------------------------------------- Transfermarkt
 tm = pd.DataFrame(json.load(open(RAW / "transfermarkt_2026.json")))
+tm["league"] = "GB1"
+if BIG5:
+    tm = pd.concat([tm, pd.DataFrame(json.load(open(RAW / "transfermarkt_big5_2026.json")))], ignore_index=True)
+    tm = tm.drop_duplicates("id", keep="first").reset_index(drop=True)
 tm["dob"] = tm["dob_age"].str.extract(r"(\d\d/\d\d/\d{4})")[0].map(dmy)
 tm["birth_year"] = tm["dob"].map(lambda d: d.year if d else np.nan)
 tm["n"] = tm["name"].map(norm)
@@ -204,6 +213,8 @@ df["years_since_extension"] = df["ext_date"].map(lambda d: (TODAY - d).days / 36
 # TM uses three labels: "Current international", "National player" (both active) and "Former International".
 # v11/v12 only parsed the first, so Saka, Rashford, Semenyo etc. were flagged as non-internationals.
 HDR = json.load(open(RAW / "transfermarkt_headers_2026.json"))
+if BIG5:
+    HDR.update(json.load(open(RAW / "transfermarkt_big5_headers_2026.json")))
 def intl_info(pid):
     for item in HDR.get(str(pid), []):
         m = re.match(r"(Current international|National player|Former International):\s*(.+)", item)
@@ -304,6 +315,8 @@ df["months_since_valuation"] = [((TODAY - d).days / 30.44) if d else np.nan for 
 TRF = RAW / "transfermarkt_transfers_2026.json"
 if TRF.exists():
     trf = json.load(open(TRF))
+    if BIG5:
+        trf.update(json.load(open(RAW / "transfermarkt_big5_transfers_2026.json")))
 
     def transfer_features(pid):
         rows = []
@@ -402,7 +415,12 @@ df["min_cur"] = df["c_minutes"].fillna(0)
 df["min_prev"] = df["p_minutes"].fillna(0)
 df["starts_cur"] = df["c_games_starts"].fillna(0)
 df["starts_prev"] = df["p_games_starts"].fillna(0)
-df["minutes_share_cur"] = df["min_cur"] / cur["minutes"].max()   # share of max possible PL minutes so far
+# share of the most minutes anyone in his league has played so far (leagues are at different matchdays)
+df["minutes_share_cur"] = df["min_cur"] / df.groupby("league")["min_cur"].transform("max").clip(lower=1)
+for lg in ["GB1", "ES1", "L1", "IT1", "FR1"]:
+    df["lg_" + lg] = (df["league"] == lg).astype(int)
+# Opta Power Rankings gap to the Premier League (same table as LEAGUE_GAP below)
+df["league_gap"] = df["league"].map({"GB1": 0.0, "ES1": 5.6, "IT1": 5.6, "L1": 6.3, "FR1": 7.1})
 df["ppg_cur"] = df["c_points_per_game"]
 
 # Two-season pooled, shrunk per-90 rates. Current season weighted 1.0, last season 0.75
@@ -447,7 +465,8 @@ df["experience_score"] = np.log1p(df["min_cur"] + df["min_prev"]) * (1 + df["int
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).parent))
 from fotmob import fotmob_features  # noqa: E402
-_fm = fotmob_features(df)
+_fm = fotmob_features(df, cur_key=["premier_league|2026/2027", "la_liga|2026/2027", "bundesliga|2026/2027",
+                                    "serie_a|2026/2027", "ligue_1|2026/2027"] if BIG5 else "premier_league|2026/2027")
 if _fm is not None:
     df = pd.concat([df, _fm], axis=1)
 # Injuries and youth internationals (Transfermarkt; see src/extras.py), as of today, season from 1 Aug 2026

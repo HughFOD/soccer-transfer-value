@@ -86,9 +86,16 @@ def dmy_iso(s):
         return None
 
 
-def build_snapshot(S, fm, caps_now):
+FM_LEAGUE = {"GB1": "premier_league", "ES1": "la_liga", "L1": "bundesliga", "IT1": "serie_a", "FR1": "ligue_1"}
+LEAGUE_GAP = {"GB1": 0.0, "ES1": 5.6, "IT1": 5.6, "L1": 6.3, "FR1": 7.1}
+
+
+BIG5_SQUADS = {}
+
+
+def build_snapshot(S, fm, caps_now, league="GB1"):
     E = extra()
-    squad = E["squads"].get(str(S - 1), [])
+    squad = E["squads"].get(str(S - 1), []) if league == "GB1" else [r[:11] for r in BIG5_SQUADS.get(str(S - 1), []) if r[11] == league]
     rows = []
     for r in squad:
         pid, name, club, position, dob_age, height, foot, joined, contract, mv, href = r
@@ -114,7 +121,11 @@ def build_snapshot(S, fm, caps_now):
     iy = pd.concat([injury_youth_features([p], [dob], [c], d, date(d.year - 1, 8, 1))
                     for p, dob, c, d in zip(df["id"], df["dob"], df["international_caps"], df["as_of"])], ignore_index=True)
     df = pd.concat([df.reset_index(drop=True), iy], axis=1)
-    fmf = fotmob_features(df.rename(columns={"name": "name"}), fm, cur_key=f"premier_league|{S-1}/{S}",
+    df["league"] = league
+    for lg in FM_LEAGUE:
+        df["lg_" + lg] = int(lg == league)
+    df["league_gap"] = LEAGUE_GAP[league]
+    fmf = fotmob_features(df.rename(columns={"name": "name"}), fm, cur_key=f"{FM_LEAGUE[league]}|{S-1}/{S}",
                           prev_seasons=(f"{S-2}/{S-1}", str(S - 1)))
     if fmf is not None:
         df = pd.concat([df, fmf.reset_index(drop=True)], axis=1)
@@ -129,11 +140,20 @@ if __name__ == "__main__":
     hist_path = RAW / "fotmob_hist.json"
     if hist_path.exists():
         fm.update(json.load(open(hist_path)))
-    cur = pd.read_csv(INTERIM / "players_all.csv", low_memory=False)
+    import os
+    B5 = os.environ.get("BIG5") == "1"
+    cur = pd.read_csv(INTERIM / ("players_b5.csv" if B5 else "players_all.csv"), low_memory=False)
     caps_now = dict(zip(cur["id"].astype(str), cur["international_caps"]))
     # players who left the PL: take senior caps from the national-team career (largest team total that is a current
     # senior label is unknown, so fall back to 0 - they get youth features from the same career data)
-    out = pd.concat([build_snapshot(S, fm, caps_now) for S in (2024, 2025, 2026)], ignore_index=True)
-    out.to_csv(INTERIM / "hist_rows.csv", index=False)
+    if B5:   # v19: past squads of La Liga, Bundesliga, Serie A, Ligue 1 (tm_big5_past_raw.json)
+        past = json.load(open(RAW / "tm_big5_past_raw.json"))
+        BIG5_SQUADS.update(past["squads"])
+        E = extra()
+        for k, v in past["X"].items():
+            E["players"].setdefault(k, v)
+    leagues = list(FM_LEAGUE) if B5 else ["GB1"]
+    out = pd.concat([build_snapshot(S, fm, caps_now, lg) for S in (2024, 2025, 2026) for lg in leagues], ignore_index=True)
+    out.to_csv(INTERIM / ("hist_rows_b5.csv" if B5 else "hist_rows.csv"), index=False)
     print(out.groupby("snapshot").agg(n=("id", "size"), with_prev=("prev_val", lambda s: s.notna().sum()),
                                       fm=("fm_matched", "sum"), med_val=("market_value_eur", "median")))

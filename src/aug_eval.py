@@ -60,12 +60,19 @@ AUG = ["age", "age_sq", "age_from_peak", "height_cm", "foot_left", "foot_both", 
        "contract_years_left", "log_wage"]
 
 
+if os.environ.get("HIST", "").endswith("_b5.csv"):   # v19: five leagues -> league features too
+    AUG = AUG + T.LEAGUE
+
+
 def load():
     cur = T.df.copy()
     cur["season_share"] = SEASON_SHARE_NOW
     cur["snapshot"] = "now"
     cur["id"] = cur["id"].astype(str)
-    hist = pd.read_csv(INTERIM / "hist_rows.csv", low_memory=False)
+    hist = pd.read_csv(INTERIM / os.environ.get("HIST", "hist_rows.csv"), low_memory=False)
+    for c in T.LEAGUE:
+        if c not in hist:
+            hist[c] = 0.0
     hist["id"] = hist["id"].astype(str)
     hist = hist[hist["prev_val"].notna() & hist["market_value_eur"].notna()].copy()
     for c in ("contract_years_left", "log_wage"):
@@ -116,8 +123,13 @@ if __name__ == "__main__":
         for g in ["FW", "MF", "DF", "GK"]:
             m = (c.pos_group == g).to_numpy(); print("   ", g, ape_stats(y[m], oof[m]), flush=True)
         m = (c.age <= 21).to_numpy(); print("    age<=21", ape_stats(y[m], oof[m]), flush=True)
+        if c.league.nunique() > 1:
+            pl = (c.league == "GB1").to_numpy()
+            print("    PL", ape_stats(y[pl], oof[pl]), "PL age<=21", ape_stats(y[pl & m], oof[pl & m]), flush=True)
+            for g in ["FW", "MF", "DF", "GK"]:
+                mm = pl & (c.pos_group == g).to_numpy(); print("      PL", g, ape_stats(y[mm], oof[mm]), flush=True)
     print("naive (previous valuation)", ape_stats(y, b))
-    pd.to_pickle((c[["id", "name"]], y, res), INTERIM / "aug_eval.pkl")
+    pd.to_pickle((c[["id", "name"]], y, res), INTERIM / ("aug_eval%s.pkl" % ("_" + os.environ["TAG"] if os.environ.get("TAG") else "")))
     if os.environ.get("WF", "1") == "1":
         for train_s, test_s in [(["summer 2024"], "summer 2025"), (["summer 2024", "summer 2025"], "summer 2026")]:
             tr = hist[hist.snapshot.isin(train_s)]; te = hist[hist.snapshot == test_s]

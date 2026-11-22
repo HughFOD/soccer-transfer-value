@@ -55,14 +55,20 @@ for i, (tr, te) in enumerate(RepeatedKFold(n_splits=5, n_repeats=n_rep, random_s
     oof["ridge"][te] += T.ridge().fit(X.iloc[tr], y[tr]).predict(X.iloc[te]) / n_rep
 oof["blend"] = (oof["lgbm"] + oof["ridge"] + oof["et"]) / 3 if USE_ET else 0.5 * oof["lgbm"] + 0.5 * oof["ridge"]
 rows = []
-for grp in [g for g in ["FW", "MF", "DF", "GK"] if (df.pos_group == g).any()] + ["ALL"]:
-    m = np.ones(len(df), bool) if grp == "ALL" else (df.pos_group == grp).to_numpy()
+groups = [g for g in ["FW", "MF", "DF", "GK"] if (df.pos_group == g).any()] + ["ALL"]
+if df.league.nunique() > 1:   # v19: also score the Premier League players alone, comparable with PL-only training
+    groups += ["PL_" + g for g in ["FW", "MF", "DF", "GK", "ALL"]] + [lg for lg in ["ES1", "L1", "IT1", "FR1"]]
+for grp in groups:
+    gg = grp.replace("PL_", "")
+    m = np.ones(len(df), bool) if gg == "ALL" else (df.pos_group == gg).to_numpy() if gg in ("FW", "MF", "DF", "GK") else (df.league == grp).to_numpy()
+    if grp.startswith("PL_"):
+        m = m & (df.league == "GB1").to_numpy()
     rows.append(dict(group=grp, n=int(m.sum()), **T.metrics(y[m], oof["blend"][m])))
     print(rows[-1], flush=True)
 naive = ((df.prev_val - df.market_value_eur).abs() / df.market_value_eur)
 for grp in [g for g in ["FW", "MF", "DF", "GK"] if (df.pos_group == g).any()]:
     print(grp, "naive prev-valuation median APE", round(100 * naive[df.pos_group == grp].median(), 1))
-tag = fs + ("_change" if TARGET == "change" else "") + ("_et" if USE_ET else "") + ("_" + SUBSET.replace(",", "") if SUBSET else "")
+tag = fs + ("_change" if TARGET == "change" else "") + ("_et" if USE_ET else "") + ("_" + SUBSET.replace(",", "") if SUBSET else "") + ("_" + os.environ["TAG"] if os.environ.get("TAG") else "")
 for nm in ["Declan Rice", "William Saliba", "Erling Haaland", "Junior Kroupi", "Florian Wirtz", "Bukayo Saka"]:
     i = np.where(df.name.values == nm)[0]
     if len(i):

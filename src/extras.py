@@ -19,6 +19,10 @@ def extra():
     if _EXTRA is None:
         p = RAW / "transfermarkt_extra_2026.json"
         _EXTRA = json.load(open(p)) if p.exists() else {"players": {}, "squads": {}}
+        b = RAW / "transfermarkt_big5_extra_2026.json"   # v19: other Big-5 leagues (injuries, national careers, values)
+        if b.exists():
+            for k, v in json.load(open(b)).items():
+                _EXTRA["players"].setdefault(k, v)
     return _EXTRA
 
 

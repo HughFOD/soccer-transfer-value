@@ -33,12 +33,16 @@ FEATS = ["log_mv","age","age2","tenure","buyer_pl","seller_pl","year"]
 def rows():
     t = json.load(open(RAW / "transfermarkt_transfers_2026.json"))
     tm = {p["id"]: p for p in json.load(open(RAW / "transfermarkt_2026.json"))}
+    if (RAW / "transfermarkt_big5_transfers_2026.json").exists():   # v19: + La Liga, Bundesliga, Serie A, Ligue 1 players
+        t.update(json.load(open(RAW / "transfermarkt_big5_transfers_2026.json")))
+        for p in json.load(open(RAW / "transfermarkt_big5_2026.json")):
+            tm.setdefault(p["id"], p)
     PL = pl_clubs(t)
     out = []
     for pid, v in t.items():
         p = tm.get(pid)
         if not p: continue
-        dob = pd.to_datetime(p["dob_age"][:10], dayfirst=True, errors="coerce")
+        dob = pd.to_datetime(str(p["dob_age"])[:10], dayfirst=True, errors="coerce")
         hist = sorted(v, key=lambda r: r[0])
         for i, (d, frm, to, fee, mv, up) in enumerate(hist):
             if up or "loan" in str(fee).lower() or d < "2021-01-01": continue

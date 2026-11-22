@@ -17,4 +17,10 @@ The scraped inputs live outside the repo. To rebuild, place these in `data/raw/`
   (`tmapi.transfermarkt.technology/player/<id>/national-career-history`) and value histories for 1,523 players.
 - `fotmob_hist.json` - FotMob stats for 2022-23 to 2024-25 (Turkey, Brazil and MLS missing).
 
+- v19 (scraped 2026-11-22): `tm_big5_raw.json` (Transfermarkt squads, profiles, value histories, transfers, injuries and
+  national careers for 2,094 La Liga, Bundesliga, Serie A and Ligue 1 players), `fbref_big5_raw.json` (FBref Big-5
+  2026-27 standard/shooting/misc/playing time, 2025-26 playing time, wages for the four leagues) and
+  `tm_big5_past_raw.json` (their squads 2023-24 to 2025-26 plus 3,264 more players' histories).
+  `src/convert_big5.py` turns the first two into the `*big5*` files the pipeline reads.
+
 Then run the pipeline in the top-level README. `data/interim/` and `out/` are generated.
