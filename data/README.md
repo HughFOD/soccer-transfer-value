@@ -23,4 +23,9 @@ The scraped inputs live outside the repo. To rebuild, place these in `data/raw/`
   `tm_big5_past_raw.json` (their squads 2023-24 to 2025-26 plus 3,264 more players' histories).
   `src/convert_big5.py` turns the first two into the `*big5*` files the pipeline reads.
 
+- v20 (2026-11-22): `fotmob_deep.json` - FotMob player and team stat lists for the five leagues, 2022-23 to
+  2026-27 (xG on target, penalties, goalkeeping, team xG for/against, possession). `fbref_deep.json` - FBref
+  Big-5 passing/GCA/possession/defense/keepersadv for 2023-24 to 2026-27 (advanced columns blank; kept for the
+  record) and standard/shooting/misc/playing time for 2023-24 and 2024-25.
+
 Then run the pipeline in the top-level README. `data/interim/` and `out/` are generated.

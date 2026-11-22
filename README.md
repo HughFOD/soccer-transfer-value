@@ -18,6 +18,9 @@ python3 src/fee.py                  # likely-fee ratios from 610 real transfers 
 (cd src && INPUT=players_b5.csv FS=full_iy_lg TARGET=change ET=1 REPEATS=2 TAG=b5big BIGGRID=1 python3 allpos.py)
 (cd src && INPUT=players_b5.csv FS=stats_xg_lg TARGET=level REPEATS=2 TAG=b5 BIGGRID=1 python3 allpos.py)
 V19=1 INPUT=players_b5.csv FULL_FS=full_iy_lg FULL_TAG=_b5big STATS_FS=stats_xg_lg TAG=b5 BIGGRID=1 python3 src/export.py > out/export_log.txt 2>&1
+python3 src/underlying.py           # v20: deep FotMob metrics (fotmob_deep.json + season files) -> underlying_b5.csv
+(cd src && INPUT=players_b5.csv DEEP=1 FS=stats_deep REPEATS=2 BIGGRID=1 python3 stats_first.py)   # stats view OOF
+# export with DEEP=1 SF_OOF=oof_sf_stats_deep.pkl STATS_FS=stats_deep (plus the v19 env above), then:
 python3 src/build_page.py           # -> dashboard/scouting_report.html + docs/index.html (publishes on push)
 ```
 

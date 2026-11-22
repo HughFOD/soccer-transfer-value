@@ -53,7 +53,12 @@ else:
     oof["blend"][_ym] = [_youth_oof[i] for i in df["id"].astype(str)[_ym]]
     df["model_used"] = np.where(_ym, "youth", np.where(df.prev_val.notna(), "full", "level"))
 YOUTH_W = 0.3
-oof_stats = pd.read_pickle(INTERIM / f"oof_allpos_{STATS_FS}{TAGS}.pkl")
+if os.environ.get("SF_OOF"):   # v20: stats view = deep-metric stats-first model (src/stats_first.py OOF)
+    _sf = pd.read_pickle(INTERIM / os.environ["SF_OOF"])
+    _sfd = dict(zip(_sf["ids"], _sf["oof"]))
+    oof_stats = {"blend": np.array([_sfd[i] for i in df["id"].astype(str)])}
+else:
+    oof_stats = pd.read_pickle(INTERIM / f"oof_allpos_{STATS_FS}{TAGS}.pkl")
 fwd = np.arange(len(df))                      # every player is scored now
 y = np.log(df.market_value_eur.to_numpy())
 CHOSEN = "blend"   # 50/50 LightGBM + ridge on log value
@@ -157,6 +162,41 @@ _lr = fee_ratio(_base, f.age.to_numpy(), _ten, (f.league == "GB1").astype(float)
 _b = np.where(_base >= 20e6, 1, 0)
 _q = np.array([FEE["bands"]["small"][:2], FEE["bands"]["big"][:2]])[_b]
 players["fee_mid"] = _base * np.exp(_lr)
+# ---- v20 scouting card: role percentiles, underlying rates, season series, projection, similar players
+UND = INTERIM / "underlying_b5.csv"
+if os.environ.get("DEEP") == "1" and UND.exists():
+    import underlying as U
+    from sklearn.neighbors import NearestNeighbors
+    ROLE_OF = f["position"].map(U.ROLE).fillna("CM").to_numpy()
+    players["role"] = ROLE_OF
+    show_u = ["u_npxg", "u_xa", "u_xgot_minus_xg", "u_npg", "u_shots", "u_sot", "u_xg_per_shot", "u_chances", "u_bcc", "u_dribbles",
+              "u_passes", "u_long_balls", "u_tackles", "u_interceptions", "u_clearances", "u_blocks", "u_recoveries", "u_def_contrib",
+              "u_press_wins", "u_goals_prevented90", "u_rating"]
+    for c in show_u + ["role_score", "proj_xgxa90", "trend_xgxa90", "team_xg_pm", "team_xga_pm", "involvement", "u_pooled_90s"]:
+        players[c] = [None if pd.isna(v) else round(float(v), 4) for v in f[c]]
+    pcols = sorted({"p_" + k for ks in U.ROLE_KEYS.values() for k in ks} | {"p_npxg", "p_xa", "p_chances", "p_dribbles", "p_passes", "p_tackles", "p_recoveries", "p_press_wins"})
+    pcols = [c for c in pcols if c in f]
+    players["pct"] = [[None if pd.isna(v) else round(float(v), 3) for v in row] for row in f[pcols].to_numpy()]
+    ser = json.load(open(INTERIM / "underlying_series.json"))
+    players["series"] = [ser.get(str(i), []) for i in f["id"]]
+    # similar players: same role, closest role-percentile profile + age (display only; not a model input)
+    # similarity on the metrics that matter for the role (role keys), using the underlying per-90 rates (standardised
+    # within role) so elite outliers match other elite players, plus age
+    sim = [None] * len(f)
+    for r in np.unique(ROLE_OF):
+        ix = np.where(ROLE_OF == r)[0]
+        cols = ["u_" + k for k in U.ROLE_KEYS[r] if "u_" + k in f]
+        Z = f.iloc[ix][cols].astype(float)
+        Z = ((Z - Z.mean()) / Z.std().replace(0, 1)).fillna(-1.0).to_numpy()
+        Z = np.c_[Z, (f["age"].to_numpy()[ix] - 26) / 4]
+        nn = NearestNeighbors(n_neighbors=min(6, len(ix))).fit(Z)
+        _, nb = nn.kneighbors(Z)
+        for a, row in zip(ix, nb):
+            sim[a] = [int(ix[j]) for j in row if ix[j] != a][:5]
+    players["similar"] = sim
+    DEEP_META = {"pct_cols": pcols, "role_keys": U.ROLE_KEYS}
+else:
+    DEEP_META = None
 players["fee_lo"] = _base * np.exp(_lr + _q[:, 0])
 players["fee_hi"] = _base * np.exp(_lr + _q[:, 1])
 players["years_at_club"] = f["years_at_club"].round(2).to_numpy()
@@ -191,6 +231,7 @@ for g, label in [("FW", "Forwards"), ("MF", "Midfielders"), ("DF", "Defenders"),
     by_pos.append(dict(group=g, label=label, n=int(m.sum()), **T.metrics(y[m], oof[CHOSEN][m]),
                        stats=T.metrics(y[m], oof_stats[CHOSEN][m]), naive_median_ape=round(100 * nv.median(), 1)))
 site = {
+    "deep": DEEP_META,
     "meta": {"snapshot": "2026-11-16", "n_players": int(len(f)), "n_training": int(len(df)), "by_pos": by_pos,
              "features_union": full_feats, "logged": "2026-11-20", "youth_age": YOUTH_AGE,
              # walk-forward test (src/aug_eval.py): trained only on earlier summers, predicting a later summer

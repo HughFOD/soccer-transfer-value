@@ -58,6 +58,16 @@ DEF = ["tackles_p90", "fm_int_p90", "clearances_p90", "blocks_p90", "recoveries_
 HISTORY_CAL = ["log_mv_1y_ago", "log_mv_peak_1y_ago", "mv_trend_prev_year", "n_valuations"]   # Round 7 v11: anchored to today
 HISTORY = ["months_since_valuation", "log_prev_val", "months_since_prev", "log_val_12m_before", "momentum_12m", "log_peak_before", "n_valuations"]
 
+# v20: deep underlying metrics (src/underlying.py) - multi-season FBref + FotMob, role percentiles, trends, projection
+DEEP = []
+_u = INTERIM / "underlying_b5.csv"
+if os.environ.get("DEEP") == "1" and _u.exists():
+    _ud = pd.read_csv(_u); _ud["id"] = _ud["id"].astype(str)
+    df["id"] = df["id"].astype(str)
+    DEEP = [c for c in _ud.columns if c != "id"]
+    df = df.drop(columns=[c for c in DEEP if c in df]).merge(_ud, on="id", how="left")
+DEEP_CORE = [c for c in DEEP if c.startswith(("u_", "role_score", "trend_", "form_vs", "age_curve", "team_", "involvement", "proj_"))]
+
 # v19: league of the current club (only varies when trained on all Big-5 leagues; BIG5=1 dataset)
 LEAGUE = ["lg_ES1", "lg_L1", "lg_IT1", "lg_FR1", "league_gap"]
 for _c in LEAGUE:
@@ -74,6 +84,9 @@ FEATURE_SETS = {
     "full_iy": PROFILE + CLUB + STATS + WAGE + HISTORY + INJ + YOUTH,
     "full_iy_lg": PROFILE + CLUB + LEAGUE + STATS + WAGE + HISTORY + INJ + YOUTH,
     "stats_xg_lg": PROFILE + CLUB + LEAGUE + STATS + XG + DEF,
+    "stats_deep": PROFILE + CLUB + LEAGUE + STATS + XG + DEF + DEEP,
+    "stats_deep_core": PROFILE + CLUB + LEAGUE + ["min_cur", "min_prev", "minutes_share_cur"] + DEEP_CORE,
+    "full_deep": PROFILE + CLUB + LEAGUE + STATS + WAGE + HISTORY + INJ + YOUTH + DEEP,
     "full_inj": PROFILE + CLUB + STATS + WAGE + HISTORY + INJ,
     "full_hist2": PROFILE + CLUB + STATS + WAGE + HISTORY + HIST2,
     "full_jump": PROFILE + CLUB + STATS + WAGE + HISTORY + JUMP,
