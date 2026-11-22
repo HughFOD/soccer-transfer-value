@@ -3,7 +3,7 @@
 Predicts Transfermarkt market values for Premier League forwards and wingers from FBref stats,
 wages, contracts and Transfermarkt value history.
 
-**Live site: https://hughod.com/transfer-value-model/** (GitHub Pages, served from `docs/index.html`).
+**Live site: https://hughod.com/soccer-transfer-value/** (GitHub Pages, served from `docs/index.html`).
 
 ## Rebuild
 
