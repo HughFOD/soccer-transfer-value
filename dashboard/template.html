@@ -96,7 +96,7 @@ thead th[aria-sort="ascending"]::after{content:" ↑"}
 thead th[aria-sort="descending"]::after{content:" ↓"}
 td b{font-weight:600}
 tbody tr:hover td{background:var(--wash)}
-tbody tr{cursor:pointer}
+tbody tr{cursor:default}
 .pill{display:inline-block;min-width:58px;text-align:center;padding:1px 8px;border-radius:3px;font:600 13px var(--sans)}
 .pill.under{background:var(--green-wash);color:var(--green)}
 .pill.over{background:var(--red-wash);color:var(--red)}
@@ -182,7 +182,7 @@ footer{padding:24px 0 50px;font:13px var(--sans);color:var(--faint);border-top:1
 
 <section>
   <h2>Estimated vs actual value</h2>
-  <p class="muted">Each dot is one player. Dots above the line are players the model values higher than Transfermarkt does; dots below, lower. Both axes are logarithmic. Click a dot to load that player into the calculator.</p>
+  <p class="muted">Each dot is one player. Dots above the line are players the model values higher than Transfermarkt does; dots below, lower. Both axes are logarithmic.</p>
   <div class="card">
     <div class="legend" style="margin-bottom:8px">
       <span><span class="sw" style="background:var(--under)"></span>Model says undervalued (est. ≥ 25% above actual)</span>
@@ -208,81 +208,6 @@ footer{padding:24px 0 50px;font:13px var(--sans);color:var(--faint);border-top:1
   <p class="note">Transfermarkt values are restated to 16 Nov 2026 money (most were set between June and October). Prev. value is his previous Transfermarkt valuation, also restated. Gap = (model estimate − Transfermarkt value) ÷ Transfermarkt value. Green: model thinks he's worth more. Red: model thinks he's worth less. "Stats-only" is the same model without any value history, which shows what the on-pitch numbers alone say. Likely fee: what a Premier League club would typically pay, from 2,211 real transfers; hover it for the range.</p>
 </section>
 
-<section id="track-record">
-  <h2>Track record</h2>
-  <p class="muted">On <span id="tr_date"></span> every Premier League estimate (the v17 model, before the other four leagues were added) was frozen in a public log, before Transfermarkt's next update round. When Transfermarkt updates, this section will show whether the players the model called undervalued actually rose, and the overvalued ones fell.</p>
-  <div class="tiles" id="tr_tiles"></div>
-  <h3 style="margin-top:18px">Already tested on the past</h3>
-  <p class="muted">The same method, trained only on earlier seasons, predicting a later Transfermarkt update it had never seen: the end-of-season revaluations of every Premier League squad (v17 method). "No change" is the naive guess that a player keeps his previous value.</p>
-  <div class="tablewrap" style="max-height:none"><table id="wf"><thead></thead><tbody></tbody></table></div>
-  <p class="note">Log: <a href="https://github.com/HughFOD/soccer-transfer-value/blob/main/tracking/estimates_2026-11-20.csv">tracking/estimates_2026-11-20.csv</a> · first check scheduled after Transfermarkt's winter update.</p>
-</section>
-
-<section id="calculator">
-  <h2>Value calculator</h2>
-  <p class="muted">Start from a real player or a typical player in any position, then change anything. With a previous Transfermarkt value, the full model runs; leave it blank and the stats-only model runs instead. Enter past values as they were published; the calculator inflates them to today's money.</p>
-  <div class="calc">
-    <div class="forms">
-      <div class="controls">
-        <label for="pick" class="muted">Start from</label>
-        <select id="pick"></select>
-        <button id="reset" type="button">Reset to this player</button>
-      </div>
-      <fieldset><legend>Player</legend>
-        <label class="f">Age<input id="i_age" type="number" step="0.1" min="15" max="40"></label>
-        <label class="f">Height (cm)<input id="i_height" type="number" min="150" max="210"></label>
-        <label class="f">Preferred foot<select id="i_foot"><option value="right">Right</option><option value="left">Left</option><option value="both">Both</option></select></label>
-        <label class="f">Position<select id="i_role"><option value="CF">Centre-forward</option><option value="W">Winger</option><option value="MF">Midfielder</option><option value="DF">Defender</option><option value="GK">Goalkeeper</option></select></label>
-        <label class="f">Senior caps<input id="i_caps" type="number" min="0"></label>
-        <label class="f">International goals<input id="i_igoals" type="number" min="0"></label>
-        <label class="f check"><input id="i_curintl" type="checkbox">Current senior international</label>
-        <label class="f check"><input id="i_eng" type="checkbox">English</label>
-      </fieldset>
-      <fieldset><legend>Club & contract</legend>
-        <label class="f">Club<select id="i_club"></select></label>
-        <label class="f">Contract years left<input id="i_contract" type="number" step="0.1" min="0" max="10"></label>
-        <label class="f">Years at club<input id="i_yac" type="number" step="0.1" min="0" max="20"></label>
-        <label class="f">Annual wage (€m, optional)<input id="i_wage" type="number" step="0.1" min="0"></label>
-      </fieldset>
-      <fieldset><legend>2026-27 league season so far</legend>
-        <label class="f">Minutes<input id="i_min_c" type="number" min="0"></label>
-        <label class="f">Starts<input id="i_st_c" type="number" min="0"></label>
-        <label class="f">Goals<input id="i_g_c" type="number" min="0"></label>
-        <label class="f">Assists<input id="i_a_c" type="number" min="0"></label>
-        <label class="f">Shots<input id="i_sh_c" type="number" min="0"></label>
-        <label class="f">Shots on target<input id="i_sot_c" type="number" min="0"></label>
-      </fieldset>
-      <fieldset><legend>2025-26 season</legend>
-        <label class="f">League<select id="i_lg"><option value="PL">Premier League</option><option value="other_big5">Other Big-5 league</option><option value="championship">Championship</option><option value="other_league">Other league (Portugal, NL, MLS…)</option><option value="none">Didn't play / youth</option></select></label>
-        <label class="f">Minutes<input id="i_min_p" type="number" min="0"></label>
-        <label class="f">Starts<input id="i_st_p" type="number" min="0"></label>
-        <label class="f">Goals<input id="i_g_p" type="number" min="0"></label>
-        <label class="f">Assists<input id="i_a_p" type="number" min="0"></label>
-        <label class="f">Shots<input id="i_sh_p" type="number" min="0"></label>
-        <label class="f">Shots on target<input id="i_sot_p" type="number" min="0"></label>
-      </fieldset>
-      <fieldset><legend>Value history (Transfermarkt, €m as published)</legend>
-        <label class="f">Previous valuation<input id="i_mv1" type="number" step="0.5" min="0"></label>
-        <label class="f">Months ago it was set<input id="i_mon" type="number" step="0.5" min="0" max="36"></label>
-        <label class="f">Value 12 months before that<input id="i_mv2" type="number" step="0.5" min="0"></label>
-        <label class="f">Highest value before<input id="i_peak" type="number" step="0.5" min="0"></label>
-      </fieldset>
-    </div>
-    <div class="result card" aria-live="polite">
-      <div class="kicker" id="r_model"></div>
-      <div class="big" id="r_val"></div>
-      <div>
-        <div class="band"><i id="r_band"></i><b id="r_mark"></b></div>
-        <div class="note" id="r_range" style="margin-top:6px"></div>
-      </div>
-      <div class="kv" id="r_kv"></div>
-      <div class="why" id="r_why"></div>
-      <p class="note" id="r_note"></p>
-      <p class="note">Priced as if Transfermarkt valued him in its latest update round (October 2026), using all of this season's minutes so far. The table instead compares against each published value on the date it was set.</p>
-    </div>
-  </div>
-</section>
-
 <section>
   <h2>What drives the estimate</h2>
   <div class="two">
@@ -304,7 +229,7 @@ footer{padding:24px 0 50px;font:13px var(--sans);color:var(--faint);border-top:1
   <div class="two">
     <div class="prose">
       <p><b>Data.</b> Transfermarkt squads for every club in the Premier League, La Liga, the Bundesliga, Serie A and Ligue 1 (2,641 players): market values, contracts, extensions, caps, height, foot, every past valuation, injuries, national-team careers and transfer fees. FBref for 2026-27 stats so far in all five leagues (standard, shooting, playing time, misc) and estimated wages, plus 2025-26 stats from the Big-5 leagues and 11 more (Championship, League One, Portugal, the Netherlands, Belgium, Scotland, Denmark, Sweden, Turkey, Brazil and MLS). FotMob adds xG, xA, chances created, dribbles, defensive actions and match ratings. Players are matched across sites by name, birth year and club: 92–98% matched to FBref in each league.</p>
-      <p><b>Audit fixes in this version.</b> Three errors were found and fixed. (1) 35 forwards, including every player at the three promoted clubs, had no 2025-26 stats because only the Big-5 leagues were loaded. (2) Transfermarkt labels active internationals two ways ("Current international" and "National player"); only one was read, so Saka, Rashford and Semenyo counted as non-internationals. (3) Most current values were set in May–July, before this season began; the model now knows each valuation's date, and the calculator prices players as of Transfermarkt's latest update round.</p>
+      <p><b>Audit fixes in this version.</b> Three errors were found and fixed. (1) 35 forwards, including every player at the three promoted clubs, had no 2025-26 stats because only the Big-5 leagues were loaded. (2) Transfermarkt labels active internationals two ways ("Current international" and "National player"); only one was read, so Saka, Rashford and Semenyo counted as non-internationals. (3) Most current values were set in May–July, before this season began; the model now knows each valuation's date.</p>
       <p><b>Stats that don't overreact.</b> Per-90 rates pool this season with last season (weighted 0.75) and are shrunk toward the average using a six-match pseudo-sample. A player with two cameo goals can't post an elite rate.</p>
       <p><b>Value trajectory.</b> For each player the model sees his previous Transfermarkt valuation, how long ago it was set, his value 12 months before that, his momentum between the two, and his peak. These are anchored to his own valuation dates. The first version used a fixed "one year ago" date, which hid fast risers: Kroupi went €15m → €22m → €40m → €70m, and the model only saw the €15m. Fixing this cut median error from 23% to 12%.</p>
       <p><b>Inflation.</b> Every past valuation, and every current one set before today, is restated to 16 November 2026 money at 10% a year. That sits between CIES's decade-long Premier League average (about 12% a year) and this summer's record spending growth (about 11%). Testing 0%, 10% and 14% changed accuracy by under a point, because inflation mostly shifts all values together. It matters for reading the numbers: a €40m valuation from 2024 is about €48m today.</p>
@@ -323,7 +248,7 @@ footer{padding:24px 0 50px;font:13px var(--sans);color:var(--faint);border-top:1
         <li><b>The target is Transfermarkt's opinion,</b> not a transfer fee. A "gap" means the model and Transfermarkt disagree, not that a deal is a bargain. The <b>Likely fee</b> column answers the other question: what a club would pay.</li>
         <li><b>Wages</b> are FBref's published estimates and cover most players; the model handles missing wages explicitly.</li>
         <li><b>Leans on Transfermarkt's own history:</b> past valuations carry most of the model's split gain. The stats-only model (about 32% median error across the five leagues, 25% in the Premier League) shows what on-pitch numbers say alone.</li>
-        <li><b>Calculator vs table:</b> the table shows out-of-sample estimates. The calculator uses the final model fitted on everyone, so for a real player it sits closer to his actual value.</li>
+        
       </ul>
     </div>
   </div>
@@ -370,7 +295,7 @@ function drawScatter(){
   const col = {under:"var(--under)", over:"var(--over)", fair:"var(--mid)"};
   const sorted = P.map((p, i) => [p, i]).sort((a, b) => Math.abs(a[0].gap_pct) - Math.abs(b[0].gap_pct));
   sorted.forEach(([p, i]) => {
-    s += `<circle data-i="${i}" cx="${x(p.market_value_eur)}" cy="${y(Math.max(3e5, p.pred_full))}" r="5" fill="${col[cls(p.gap_pct)]}" fill-opacity=".85" stroke="var(--surface)" stroke-width="2" style="cursor:pointer"/>`;
+    s += `<circle data-i="${i}" cx="${x(p.market_value_eur)}" cy="${y(Math.max(3e5, p.pred_full))}" r="5" fill="${col[cls(p.gap_pct)]}" fill-opacity=".85" stroke="var(--surface)" stroke-width="2" />`;
   });
   const label = ["Erling Haaland", "Junior Kroupi", "George Hemmings", "Kai Havertz"];
   P.forEach(p => { if (label.includes(p.name)) s += `<text x="${x(p.market_value_eur) + 8}" y="${y(Math.max(3e5, p.pred_full)) + 4}" style="fill:var(--ink-2)">${p.name.split(" ").slice(-1)[0]}</text>`; });
@@ -387,7 +312,6 @@ $("#scatter").addEventListener("mousemove", e => {
   tip.style.left = lx + "px"; tip.style.top = (e.clientY - r.top - 10) + "px";
 });
 $("#scatter").addEventListener("mouseleave", () => tip.style.display = "none");
-$("#scatter").addEventListener("click", e => { const c = e.target.closest("circle"); if (c) loadPlayer(+c.dataset.i, true); });
 
 // ---------- table
 const COLS = [
@@ -427,200 +351,12 @@ function renderTable(){
 }
 $("#tbl thead").addEventListener("click", e => { const th = e.target.closest("th"); if (!th) return; const k = th.dataset.k; sortDir = k === sortKey ? -sortDir : (["name", "club"].includes(k) ? 1 : -1); sortKey = k; document.querySelectorAll("#tbl th").forEach(t => t.removeAttribute("aria-sort")); th.setAttribute("aria-sort", sortDir > 0 ? "ascending" : "descending"); renderTable(); });
 $("#tbl thead").addEventListener("keydown", e => { if (e.key === "Enter") e.target.click(); });
-$("#tbl tbody").addEventListener("click", e => { const tr = e.target.closest("tr"); if (tr) loadPlayer(+tr.dataset.i, true); });
 $("#q").addEventListener("input", renderTable); $("#clubf").addEventListener("change", renderTable);
 $("#lgf").addEventListener("change", () => { fillClubs(); renderTable(); });
 document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => { roleF = b.dataset.role; document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", x === b)); renderTable(); }));
 renderTable();
 
-// ---------- track record (frozen calls; results arrive after Transfermarkt's next update)
-{ const calls = {under: P.filter(p => p.gap_pct >= 25), over: P.filter(p => p.gap_pct <= -25)};
-  $("#tr_date").textContent = "20 Nov 2026";
-  const top = a => a.slice().sort((x, y) => Math.abs(y.gap_pct) - Math.abs(x.gap_pct)).slice(0, 3).map(p => p.name.split(" ").slice(-1)[0]).join(", ");
-  $("#tr_tiles").innerHTML = [
-    ["lead", calls.under.length, "Called undervalued", "e.g. " + top(calls.under)],
-    ["", calls.over.length, "Called overvalued", "e.g. " + top(calls.over)],
-    ["", P.length - calls.under.length - calls.over.length, "Called fair", "within ±25% of Transfermarkt"],
-    ["", "Pending", "Result", "after Transfermarkt's next update"],
-  ].map(([c, v, l, sub]) => `<div class="tile ${c}"><div class="v">${v}</div><div class="l">${l}</div><div class="s">${sub}</div></div>`).join(""); }
-
-$("#wf thead").innerHTML = "<tr><th class='l'>Trained on</th><th class='l'>Predicted</th><th>Players</th><th>Model median</th><th>Model ±25%</th><th>No change median</th><th>No change ±25%</th></tr>";
-$("#wf tbody").innerHTML = M.walk_forward.map(r => `<tr style="cursor:default"><td class="l">${r.train}</td><td class="l">${r.test}</td><td>${r.n}</td><td><b>${r.model.median.toFixed(1)}%</b></td><td>${r.model.within25.toFixed(1)}%</td><td>${r.naive.median.toFixed(1)}%</td><td>${r.naive.within25.toFixed(1)}%</td></tr>`).join("");
-
-// ---------- model evaluation in the browser (exported LightGBM trees)
-function tree(n, x){ while (n.v === undefined){ let v = x[n.f]; if (v === null || v === undefined) v = NaN; let left;
-  if (n.mt === "NaN" && isNaN(v)) left = n.dl; else if (n.mt === "Zero" && (isNaN(v) || Math.abs(v) <= 1e-35)) left = n.dl; else { if (isNaN(v)) v = 0; left = v <= n.t; }
-  n = left ? n.l : n.r; } return n.v; }
-function ridgeLog(model, x){ const r = model.ridge; const z = x.map((v, i) => (v === null || v === undefined || isNaN(v)) ? r.impute[i] : v);
-  r.ind.forEach(i => z.push((x[i] === null || x[i] === undefined || isNaN(x[i])) ? 1 : 0));
-  return z.reduce((s, v, i) => s + (v - r.mean[i]) / r.scale[i] * r.coef[i], r.intercept); }
-const lgbLog = (model, x) => model.trees.reduce((s, t) => s + tree(t, x), 0);
-// ---------- per-player "why": path contributions (LightGBM, Extra Trees) + exact ridge terms, averaged like the blend
-function lgbContrib(model, x){ const c = new Float64Array(model.features.length); let bias = 0;
-  for (const t of model.trees){ let n = t; bias += (n.v !== undefined ? n.v : n.iv);
-    while (n.v === undefined){ let v = x[n.f]; if (v === null || v === undefined) v = NaN; let left;
-      if (n.mt === "NaN" && isNaN(v)) left = n.dl; else if (n.mt === "Zero" && (isNaN(v) || Math.abs(v) <= 1e-35)) left = n.dl; else { if (isNaN(v)) v = 0; left = v <= n.t; }
-      const ch = left ? n.l : n.r; c[n.f] += (ch.v !== undefined ? ch.v : ch.iv) - n.iv; n = ch; } }
-  return {bias, c}; }
-function etContrib(model, x){ const e = model.et, k = model.features.length, c = new Float64Array(k); let bias = 0;
-  const z = x.map((v, i) => (v === null || v === undefined || isNaN(v)) ? e.impute[i] : v); e.ind.forEach(i => z.push((x[i] === null || x[i] === undefined || isNaN(x[i])) ? 1 : 0));
-  for (const t of e.trees){ let n = 0; bias += t.v[0];
-    while (t.l[n] !== -1){ const ch = z[t.f[n]] <= t.t[n] ? t.l[n] : t.r[n]; const fi = t.f[n] < k ? t.f[n] : e.ind[t.f[n] - k]; c[fi] += t.v[ch] - t.v[n]; n = ch; } }
-  for (let i = 0; i < k; i++) c[i] /= e.trees.length; return {bias: bias / e.trees.length, c}; }
-function ridgeContrib(model, x){ const r = model.ridge, k = model.features.length, c = new Float64Array(k);
-  const z = x.map((v, i) => (v === null || v === undefined || isNaN(v)) ? r.impute[i] : v); r.ind.forEach(i => z.push((x[i] === null || x[i] === undefined || isNaN(x[i])) ? 1 : 0));
-  let bias = r.intercept; z.forEach((v, i) => { const fi = i < k ? i : r.ind[i - k]; c[fi] += (v - r.mean[i]) / r.scale[i] * r.coef[i]; }); return {bias, c}; }
-const GROUP_OF = f => /^(log_prev_val|months_since_prev|log_val_12m_before|momentum_12m|log_peak_before|n_valuations|months_since_valuation)$/.test(f) ? "Value trend"
-  : /^age/.test(f) ? "Age"
-  : /^(min_|starts_|minutes_share|pooled_90s|experience_score|fm_matched|fm_min_|season_share)/.test(f) ? "Playing time"
-  : /^(contract|years_at_club|new_signing|years_since_extension|log_wage|has_wage)/.test(f) ? "Contract and wage"
-  : /^(club_loo|team_gd|ppg_cur)/.test(f) ? "Club"
-  : /^(international_caps|intl_goals|caps_per_age|senior_intl|current_intl|former_intl|youth_intl|english)/.test(f) ? "International"
-  : /^(injured_now|days_out|n_injuries|longest_injury)/.test(f) ? "Injuries"
-  : /^(youth_caps|youth_levels|nat_debut_age|recent_national)/.test(f) ? "Youth international career"
-  : /^(height_cm|foot_|is_winger|pos_)/.test(f) ? "Position and build"
-  : /^(prev_pl|prev_big5|prev_champ|prev_other|aug_prev_)/.test(f) ? "League last season"
-  : "Output (goals, xG, defending)";
-function explain(model, feat){ const x = model.features.map(f => feat[f] ?? NaN);
-  const parts = [lgbContrib(model, x), ridgeContrib(model, x)]; if (model.et) parts.push(etContrib(model, x));
-  const w = 1 / parts.length, groups = {}; let bias = 0;
-  parts.forEach(p => { bias += w * p.bias; p.c.forEach((v, i) => { const g = GROUP_OF(model.features[i]); groups[g] = (groups[g] || 0) + w * v; }); });
-  return {bias, groups}; }
-function renderWhy(model, feat, value){
-  const {bias, groups} = explain(model, feat); const change = model.target === "change";
-  const start = change ? Math.exp(feat.log_prev_val) : Math.exp(bias);
-  const rows = Object.entries(groups).filter(([, v]) => Math.abs(v) >= 0.01).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
-  if (change) rows.unshift(["Typical move at an update", bias]);
-  const pct = v => (v >= 0 ? "+" : "−") + Math.abs(Math.round((Math.exp(v) - 1) * 100)) + "%";
-  const bar = v => { const w = Math.min(50, Math.abs(Math.exp(v) - 1) * 200); /* full half-bar at ±25% */ return `<span class="bar"><i class="${v >= 0 ? "up" : "dn"}" style="width:${w}%"></i></span>`; };
-  $("#r_why").innerHTML = `<h4>Why this number</h4><div class="row total"><span>${change ? "Previous Transfermarkt value (today's money)" : "Average player"}</span><span></span><span class="pct">${eur(start)}</span></div>` +
-    rows.map(([g, v]) => `<div class="row"><span>${g}</span>${bar(v)}<span class="pct ${v >= 0 ? "up" : "dn"}">${pct(v)}</span></div>`).join("") +
-    `<div class="row total"><span>Estimate</span><span></span><span class="pct">${eur(value)}</span></div>`;
-}
-
-// The full model predicts the change from the previous valuation (log ratio); the stats-only model predicts the value itself.
-function etLog(model, x){ const e = model.et; const z = x.map((v, i) => (v === null || v === undefined || isNaN(v)) ? e.impute[i] : v);
-  e.ind.forEach(i => z.push((x[i] === null || x[i] === undefined || isNaN(x[i])) ? 1 : 0));
-  let s = 0; for (const t of e.trees){ let n = 0; while (t.l[n] !== -1) n = z[t.f[n]] <= t.t[n] ? t.l[n] : t.r[n]; s += t.v[n]; } return s / e.trees.length; }
-const predict = (model, feat) => { const x = model.features.map(f => feat[f] ?? NaN);
-  const z = model.et ? (lgbLog(model, x) + ridgeLog(model, x) + etLog(model, x)) / 3 : 0.5 * lgbLog(model, x) + 0.5 * ridgeLog(model, x);
-  return Math.exp(model.target === "change" ? feat.log_prev_val + z : z); };
-const FULL = DATA.models.full, YOUTH = DATA.models.youth, STATS = DATA.models.stats_only, FN = M.features_union;
-const CLUB = Object.fromEntries(DATA.clubs.map(c => [c.club, c]));
-
-// derived features from the visible inputs (mirrors build_dataset.py)
-function derive(inp){
-  const pr = M.priors, K = 6, W = 0.75, d = {};
-  d.age = inp.age; d.age_sq = inp.age ** 2; d.age_from_peak = Math.abs(inp.age - 26);
-  d.height_cm = inp.height; d.foot_left = +(inp.foot === "left"); d.foot_both = +(inp.foot === "both");
-  d.international_caps = inp.caps; d.intl_goals = inp.igoals; d.caps_per_age = inp.caps / Math.max(inp.age - 16, 1);
-  d.senior_intl = +(inp.caps > 0); d.current_intl = +inp.curintl; d.former_intl = +(!inp.curintl && inp.caps > 0); d.english = +inp.eng; d.is_winger = +(inp.role === "W");
-  d.contract_years_left = inp.contract; d.years_at_club = inp.yac; d.new_signing = +(inp.yac < 0.5);
-  const cl = CLUB[inp.club]; d.club_loo_log_mv = cl.club_log_mv; d.team_gd_per90 = cl.team_gd_per90; d.ppg_cur = cl.ppg_cur;
-  const lg = cl.league || "GB1"; ["ES1", "L1", "IT1", "FR1"].forEach(l => d["lg_" + l] = +(lg === l)); d.league_gap = (M.league_gap || {})[lg] ?? 0;
-  d.min_cur = inp.min_c; d.min_prev = inp.min_p; d.starts_cur = inp.st_c; d.starts_prev = inp.st_p;
-  d.minutes_share_cur = inp.min_c / ((M.max_min_by_league || {})[lg] || M.max_cur_minutes);
-  const n90 = inp.min_c / 90 + W * inp.min_p / 90; d.pooled_90s = n90;
-  d.prev_pl = +(inp.lg === "PL"); d.prev_big5 = +(["PL", "other_big5"].includes(inp.lg));
-  d.prev_champ = +(inp.lg === "championship"); d.prev_other = +(inp.lg === "other_league");
-  d.aug_prev_pl = d.prev_pl; d.aug_prev_big5 = d.prev_big5; d.aug_prev_champ = d.prev_champ;   // youth-model names
-  d.fm_min_cur = inp.min_c; d.fm_min_prev = inp.min_p; d.fm_min_total = inp.min_c + inp.min_p;
-  const rate = (c, p, prior) => (c + W * p + K * prior) / (n90 + K);
-  d.gls_per90 = rate(inp.g_c, inp.g_p, pr.goals); d.ast_per90 = rate(inp.a_c, inp.a_p, pr.assists);
-  d.npg_per90 = rate(inp.g_c, inp.g_p, pr.goals_pens); d.sh_per90 = rate(inp.sh_c, inp.sh_p, pr.shots);
-  d.sot_per90 = rate(inp.sot_c, inp.sot_p, pr.shots_on_target);
-  d.ga_per90 = d.gls_per90 + d.ast_per90; d.npga_per90 = d.npg_per90 + d.ast_per90;
-  d.g_per_sh = (inp.g_c + W * inp.g_p + 0.5) / (inp.sh_c + W * inp.sh_p + 5);
-  d.ga_cur = inp.g_c + inp.a_c; d.ga_prev = inp.g_p + inp.a_p;
-  d.experience_score = Math.log1p(inp.min_c + inp.min_p) * (1 + inp.caps / 50);
-  d.log_wage = inp.wage > 0 ? Math.log(inp.wage * 1e6) : NaN; d.has_wage = +(inp.wage > 0);
-  const mon = isNaN(inp.mon) ? 4 : inp.mon, inf = m => Math.pow(1 + M.inflation, m / 12);
-  const prev = inp.mv1 > 0 ? inp.mv1 * 1e6 * inf(mon) : NaN, v12 = inp.mv2 > 0 ? inp.mv2 * 1e6 * inf(mon + 12) : NaN;
-  d.log_prev_val = Math.log(prev); d.months_since_prev = inp.mv1 > 0 ? mon : NaN;
-  d.log_val_12m_before = Math.log(v12); d.momentum_12m = Math.log(prev / v12);
-  d.log_peak_before = inp.mv1 > 0 ? Math.log(Math.max(prev, (inp.peak || 0) * 1e6 * inf(mon + 12), isNaN(v12) ? 0 : v12)) : NaN;
-  d.pos_DF = +(inp.role === "DF"); d.pos_MF = +(inp.role === "MF"); d.pos_GK = +(inp.role === "GK");
-  return d;
-}
-const IDS = ["age","height","foot","role","caps","igoals","curintl","eng","club","contract","yac","wage","min_c","st_c","g_c","a_c","sh_c","sot_c","lg","min_p","st_p","g_p","a_p","sh_p","sot_p","mv1","mon","peak","mv2"];
-function readInputs(){ const o = {}; IDS.forEach(k => { const el = $("#i_" + k); o[k] = el.type === "checkbox" ? el.checked : el.tagName === "SELECT" ? el.value : (el.value === "" ? NaN : +el.value); });
-  ["caps","igoals","min_c","st_c","g_c","a_c","sh_c","sot_c","min_p","st_p","g_p","a_p","sh_p","sot_p"].forEach(k => { if (isNaN(o[k])) o[k] = 0; }); return o; }
-function setInputs(o){ IDS.forEach(k => { const el = $("#i_" + k); if (el.type === "checkbox") el.checked = !!o[k]; else el.value = o[k] == null || (typeof o[k] === "number" && isNaN(o[k])) ? "" : o[k]; }); }
-
-let base = null, d0 = null, current = null;
-const r1 = v => v == null ? "" : Math.round(v * 10) / 10;
-function inputsFor(p){
-  return {age: r1(p.age), height: p.height_cm, foot: ["left","both"].includes(p.foot) ? p.foot : "right", role: p.pos_group === "FW" ? (p.is_winger ? "W" : "CF") : p.pos_group,
-    caps: p.international_caps || 0, igoals: p.intl_goals || 0, curintl: !!p.current_intl, eng: !!p.english, club: p.club,
-    contract: r1(p.contract_years_left), yac: r1(p.years_at_club), wage: p.annual_wage_eur ? r1(p.annual_wage_eur / 1e6) : "",
-    min_c: p.min_cur, st_c: p.starts_cur, g_c: p.c_goals || 0, a_c: p.c_assists || 0, sh_c: p.c_shots || 0, sot_c: p.c_shots_on_target || 0,
-    lg: p.prev_season_league, min_p: p.min_prev, st_p: p.starts_prev, g_p: p.p_goals || 0, a_p: p.p_assists || 0, sh_p: p.p_shots || 0, sot_p: p.p_shots_on_target || 0,
-    mv1: p.prev_nom ?? "", mon: p.prev_months_ago ?? "", mv2: p.v12_nom ?? "", peak: p.peak_nom ?? ""};
-}
-let feeRef = null; // calculator estimate before any edits, so a real player's fee starts from his Transfermarkt value
-function loadPlayer(i, scroll){
-  feeRef = null;
-  if (i < 0){ // typical player (forward medians; the Position field switches the group)
-    current = null; base = Object.fromEntries(FN.map((f, j) => [f, M.median_fvec.FW[j] ?? NaN]));
-    const med = {age: 24.5, height: 182, foot: "right", role: "CF", caps: 10, igoals: 2, curintl: false, eng: false, club: "Brentford FC", contract: 3.5, yac: 1.5, wage: "",
-      min_c: 600, st_c: 7, g_c: 2, a_c: 1, sh_c: 12, sot_c: 5, lg: "PL", min_p: 1800, st_p: 20, g_p: 6, a_p: 3, sh_p: 40, sot_p: 15, mv1: 20, mon: 4, peak: 22, mv2: 15};
-    setInputs(med); d0 = null; $("#pick").value = "-1";
-  } else {
-    const p = P[i]; current = p; base = Object.fromEntries(FN.map((f, j) => [f, p.fvec[j] ?? NaN]));
-    setInputs(inputsFor(p)); d0 = derive(readInputs()); $("#pick").value = String(i);
-  }
-  compute();
-  if (scroll) $("#calculator").scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start"});
-}
-// likely transfer fee: value x fee/value ratio learned from real transfers (src/fee.py); assumes a Premier League buyer
-function feeAt(val, age, tenure, sellerPL = 1){
-  const F = M.fee, x = [Math.log(Math.min(val, F.cap)), age, (age - 25) ** 2, Math.min(8, Math.max(0, tenure)), 1, sellerPL, F.year];
-  const lr = x.reduce((s, xi, j) => s + (xi - F.mu[j]) / F.sd[j] * F.coef[j], F.b), q = val >= 20e6 ? F.bands.big : F.bands.small;
-  return [val * Math.exp(lr), val * Math.exp(lr + q[0]), val * Math.exp(lr + q[1])];
-}
-function compute(){
-  const inp = readInputs(), d1 = derive(inp), feat = {};
-  if (!current) { const g = {CF:"FW", W:"FW", MF:"MF", DF:"DF", GK:"GK"}[inp.role] || "FW"; base = Object.fromEntries(FN.map((f, j) => [f, M.median_fvec[g][j] ?? NaN])); }
-  // For a real player: keep his exact stored features and apply only the change the user made (d1 - d0).
-  FN.forEach(f => {
-    if (!(f in d1)) { feat[f] = base[f]; return; }
-    if (!d0) { feat[f] = d1[f]; return; }
-    if (Object.is(d1[f], d0[f]) || Math.abs(d1[f] - d0[f]) < 1e-9) { feat[f] = base[f]; return; }
-    if (isNaN(d1[f])) { feat[f] = NaN; return; }
-    if (isNaN(d0[f]) || isNaN(base[f])) { feat[f] = d1[f]; return; }
-    feat[f] = Math.abs(d1[f] - d0[f]) < 1e-9 ? base[f] : base[f] + (d1[f] - d0[f]);
-  });
-  feat.months_since_valuation = 1.3; // priced as if valued in Transfermarkt's latest update round (7 Oct 2026), the freshest values in the data
-  // club context: a club change uses that club's profile
-  if (d0 && current && inp.club !== current.club) ["club_loo_log_mv","team_gd_per90","ppg_cur","lg_ES1","lg_L1","lg_IT1","lg_FR1","league_gap","minutes_share_cur"].forEach(f => { if (f in d1) feat[f] = d1[f]; });
-  const useFull = !isNaN(feat.log_prev_val);
-  const youth = useFull && inp.age <= M.youth_age;
-  const model = useFull ? (youth ? YOUTH : FULL) : STATS, met = useFull ? M.metrics : M.metrics_stats;
-  const v = predict(model, feat);
-  const e = met.median_ape / 100, lo = v / (1 + e), hi = v * (1 + e); // half of out-of-sample errors fall inside this band
-  $("#r_model").textContent = !useFull ? "Stats-only model · no value history" : youth ? "Youth model · 21 and under, trained on three past seasons too" : "Full model · with value trajectory";
-  $("#r_val").textContent = eur(v);
-  $("#r_range").textContent = `Typical range ${eur(lo)} – ${eur(hi)} (half of players land inside ±${Math.round(met.median_ape)}% of the estimate)`;
-  const L = Math.log10(5e5), H = Math.log10(3e8), pos = t => Math.max(0, Math.min(100, (Math.log10(t) - L) / (H - L) * 100));
-  $("#r_band").style.left = pos(lo) + "%"; $("#r_band").style.width = (pos(hi) - pos(lo)) + "%"; $("#r_mark").style.left = `calc(${pos(v)}% - 1px)`;
-  let kv = "";
-  if (current) kv += `<span>Transfermarkt today</span><span>${eur(current.market_value_eur)}</span><span>Out-of-sample estimate</span><span>${eur(current.pred_full)}</span>`;
-  if (feeRef === null) feeRef = v;
-  const fbase = current ? current.market_value_eur * v / feeRef : v;
-  const fr = feeAt(fbase, inp.age, current && current.years_at_club != null ? current.years_at_club : 2.5, +((CLUB[inp.club] || {}).league === "GB1" || !(CLUB[inp.club] || {}).league));
-  kv += `<span>${current ? "Likely fee (Transfermarkt value, moved by your edits)" : "Likely fee at this value"}</span><span>${eur(fr[0])} <span class="muted">(${eur(fr[1])} – ${eur(fr[2])})</span></span>`;
-  if (useFull) kv += `<span>Change vs previous valuation</span><span>${pct(100 * (v / Math.exp(feat.log_prev_val) - 1))}</span>`;
-  kv += `<span>Goals + assists per 90 (pooled)</span><span>${feat.ga_per90.toFixed(2)}</span><span>Minutes, both seasons</span><span>${Math.round(inp.min_c + inp.min_p).toLocaleString()}</span>`;
-  $("#r_kv").innerHTML = kv;
-  renderWhy(model, feat, v);
-  $("#r_note").textContent = current ? "Fitted on every player including this one, so it sits nearer his real value than the out-of-sample estimate does." : "A typical Premier League forward. Change Position and any other field to see how the estimate moves.";
-}
-$("#pick").innerHTML = `<option value="-1">A typical player (custom)</option>` + P.map((p, i) => [p, i]).sort((a, b) => b[0].market_value_eur - a[0].market_value_eur).map(([p, i]) => `<option value="${i}">${p.name} · ${p.club}</option>`).join("");
-$("#i_club").innerHTML = LGS.map(l => `<optgroup label="${LG_NAME[l]}">` + DATA.clubs.filter(c => (c.league || "GB1") === l).map(c => c.club).sort().map(c => `<option>${c}</option>`).join("") + "</optgroup>").join("");
-$("#pick").addEventListener("change", e => loadPlayer(+e.target.value));
-$("#reset").addEventListener("click", () => loadPlayer(+$("#pick").value));
-document.querySelector(".forms").addEventListener("input", e => { if (e.target.id !== "pick") compute(); });
-loadPlayer(P.findIndex(p => p.name === "Bukayo Saka"));
+const FULL = DATA.models.full, STATS = DATA.models.stats_only;
 
 // ---------- importance + comparison
 const NICE = {injured_now:"Injured now", days_out_365:"Days injured, last 12 months", days_out_season:"Days injured this season", n_injuries_2y:"Injuries, last 2 years", longest_injury_2y:"Longest injury, last 2 years", youth_caps:"Youth caps", youth_levels:"Youth age groups played", nat_debut_age:"Age at national-team debut", recent_national:"Played for a national team in the last year", fm_rating:"FotMob match rating", xg_p90:"xG per 90", xa_p90:"xA per 90", xgxa_p90:"xG + xA per 90", bcc_p90:"Big chances created per 90", chances_p90:"Chances created per 90", dribbles_p90:"Dribbles per 90", finishing:"Goals above xG", fm_matched:"Has FotMob data", tackles_p90:"Tackles per 90", fm_int_p90:"Interceptions per 90", clearances_p90:"Clearances per 90", blocks_p90:"Blocks per 90", recoveries_p90:"Recoveries per 90", press_wins_p90:"High turnovers per 90", def_contrib_p90:"Defensive actions per 90", passes_p90:"Accurate passes per 90", long_balls_p90:"Accurate long balls per 90", months_since_valuation:"Age of TM valuation", prev_big5:"Played Big-5 last season", prev_pl:"Played PL last season", prev_champ:"Played Championship last season", prev_other:"Played other league last season", former_intl:"Former international", current_intl:"Current international", youth_intl:"Youth international", has_wage:"Has wage data", log_prev_val:"Previous valuation", months_since_prev:"Months since prev. valuation", log_val_12m_before:"Value 12 months earlier", momentum_12m:"Value momentum (12 mo)", log_peak_before:"Peak value before", log_mv_1y_ago:"Value 1 year ago", age:"Age", pooled_90s:"Minutes (pooled 90s)", contract_years_left:"Contract years left", experience_score:"Experience (mins × caps)", min_cur:"Minutes this season", log_mv_peak_1y_ago:"Peak value", age_sq:"Age²", club_loo_log_mv:"Club squad value", years_since_extension:"Years since extension", log_wage:"Wage", mv_trend_prev_year:"Value trend (prior yr)", min_prev:"Minutes last season", ga_per90:"G+A per 90", npga_per90:"Non-pen G+A per 90", years_at_club:"Years at club", team_gd_per90:"Team goal diff. on pitch", international_caps:"Caps", caps_per_age:"Caps per year", sh_per90:"Shots per 90", gls_per90:"Goals per 90", ast_per90:"Assists per 90", age_from_peak:"Distance from age 26", ga_prev:"G+A last season", ga_cur:"G+A this season", height_cm:"Height", ppg_cur:"Team points per game", fouled_per90:"Fouled per 90", starts_prev:"Starts last season", starts_cur:"Starts this season", minutes_share_cur:"Share of minutes", sot_per90:"Shots on target per 90", g_per_sh:"Goals per shot", pos_MF:"Is midfielder", pos_DF:"Is defender", pos_GK:"Is goalkeeper", n_valuations:"No. of valuations", intl_goals:"International goals"};

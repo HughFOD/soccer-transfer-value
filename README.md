@@ -18,8 +18,7 @@ python3 src/fee.py                  # likely-fee ratios from 610 real transfers 
 (cd src && INPUT=players_b5.csv FS=full_iy_lg TARGET=change ET=1 REPEATS=2 TAG=b5big BIGGRID=1 python3 allpos.py)
 (cd src && INPUT=players_b5.csv FS=stats_xg_lg TARGET=level REPEATS=2 TAG=b5 BIGGRID=1 python3 allpos.py)
 V19=1 INPUT=players_b5.csv FULL_FS=full_iy_lg FULL_TAG=_b5big STATS_FS=stats_xg_lg TAG=b5 BIGGRID=1 python3 src/export.py > out/export_log.txt 2>&1
-python3 -c "t=open('dashboard/template.html').read(); d=open('out/site_data.json').read(); open('dashboard/scouting_report.html','w').write(t.replace('__DATA__', d))"
-cp dashboard/scouting_report.html docs/index.html   # publishes to GitHub Pages on push
+python3 src/build_page.py           # -> dashboard/scouting_report.html + docs/index.html (publishes on push)
 ```
 
 ## Raw data (collected 2026-11-16 via the browser)
